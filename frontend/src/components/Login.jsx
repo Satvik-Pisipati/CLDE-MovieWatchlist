@@ -9,7 +9,10 @@ function Login({ onLogin }) {
       const res = await axios.post(`${backendUrl}/auth/google`, {
         credential: credentialResponse.credential,
       });
-      if (res.data.success) onLogin(res.data.user);
+      if (res.data.success) {
+        console.log("✅ Login erfolgreich:", res.data.user);
+        onLogin(res.data.user);
+      }
     } catch (err) {
       console.error("Login error:", err);
     }
@@ -20,12 +23,15 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div style={{ marginTop: "2rem" }}>
-      <GoogleLogin
-        onSuccess={handleSuccess}
-        onError={handleError}
-        useOneTap
-      />
+    <div
+      style={{
+        textAlign: "center",
+        fontFamily: "sans-serif",
+        marginTop: "5rem",
+      }}
+    >
+      <h1>🎬 Movie Watchlist – Google Login</h1>
+      <GoogleLogin onSuccess={handleSuccess} onError={handleError} useOneTap />
     </div>
   );
 }

@@ -1,35 +1,26 @@
 import { useState } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import Login from "./components/Login";
+import Dashboard from "./pages/Dashboard";
+import MainPage from "./pages/MainPage";
+import WatchlistPage from "./pages/WatchlistPage";
 
 function App() {
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    navigate("/home");
+  };
 
   return (
-    <div
-      style={{
-        fontFamily: "sans-serif",
-        textAlign: "center",
-        marginTop: "5rem",
-      }}
-    >
-      <h1>🎬 Movie Watchlist – Google Login</h1>
-
-      {user ? (
-        <div>
-          <p>Willkommen, {user.name}</p>
-          <img
-            src={user.picture}
-            alt="Profil"
-            width="80"
-            style={{ borderRadius: "50%" }}
-          />
-          <p>{user.email}</p>
-          <button onClick={() => setUser(null)}>Logout</button>
-        </div>
-      ) : (
-        <Login onLogin={setUser} />
-      )}
-    </div>
+    <Routes>
+      <Route path="/" element={<Login onLogin={handleLogin} />} />
+      <Route path="/dashboard" element={<Dashboard user={user} />} />
+      <Route path="/home" element={<MainPage user={user} />} />
+      <Route path="/watchlist" element={<WatchlistPage user={user} />} />
+    </Routes>
   );
 }
 
