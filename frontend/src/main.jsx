@@ -13,10 +13,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <GoogleOAuthProvider clientId={clientId}>
       <BrowserRouter>
         <WatchlistProvider>
-          <RatingsProvider>
-            <App />
-          </RatingsProvider>
-        </WatchlistProvider>
+    <RatingsProvider>
+          <App />
+            </RatingsProvider>
+  </WatchlistProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>
   </React.StrictMode>
