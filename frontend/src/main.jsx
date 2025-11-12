@@ -1,20 +1,34 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App.jsx";
-import { GoogleOAuthProvider } from "@react-oauth/google";
-import { WatchlistProvider } from "./state/WatchlistContext.jsx";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+import Layout from "./components/Layout.jsx";
+import MainPage from "./pages/MainPage.jsx";
+import WatchlistPage from "./pages/WatchlistPage.jsx";
+import { WatchlistProvider } from "./state/WatchlistContext.jsx"; // <-- wrap with this!
+import "./css/theme.css";
+
+/* ---- Theme bootstrap: prevents flash ---- */
+(() => {
+  const saved = localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const initial = saved || (prefersDark ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", initial);
+})();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={clientId}>
+    <WatchlistProvider>
       <BrowserRouter>
-        <WatchlistProvider>
-          <App />
-        </WatchlistProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<MainPage />} />
+            <Route path="/watchlist" element={<WatchlistPage />} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
+          </Routes>
+        </Layout>
       </BrowserRouter>
-    </GoogleOAuthProvider>
+    </WatchlistProvider>
   </React.StrictMode>
 );
