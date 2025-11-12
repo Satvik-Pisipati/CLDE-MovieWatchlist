@@ -1,6 +1,22 @@
 import { useEffect, useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import Breadcrumbs from "./Breadcrumbs";
+import { useAuth } from "../state/AuthContext.jsx";
+import { Link } from "react-router-dom";
+
+function AuthSection() {
+  const { user, logout } = useAuth();
+  if (user) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <img src={user.picture} alt="" width="28" height="28" style={{ borderRadius: "50%" }} />
+        <span>{user.name}</span>
+        <button className="btn ghost" onClick={logout}>Logout</button>
+      </div>
+    );
+  }
+  return <Link className="btn" to="/login">Sign in</Link>;
+}
 
 export default function NavBar() {
   // theme (persisted) stored on <html data-theme="...">

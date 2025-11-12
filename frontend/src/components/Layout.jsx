@@ -1,5 +1,7 @@
+// frontend/src/components/Layout.jsx
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../state/AuthContext.jsx";
 
 export default function Layout({ children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -9,6 +11,7 @@ export default function Layout({ children }) {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth(); // <-- use auth context
 
   // Apply & persist theme
   useEffect(() => {
@@ -23,22 +26,25 @@ export default function Layout({ children }) {
 
   const handleNav = (path) => {
     setDrawerOpen(false);
-    navigate(path);
+    // If trying to open /watchlist while logged out, go to /login instead
+    if (path === "/watchlist" && !user) {
+      navigate("/login", { replace: true });
+    } else {
+      navigate(path);
+    }
   };
 
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
-  // --- NEW: simple sign-out handler ---
+  // Use context logout and send to /login
   const handleSignOut = () => {
-    try {
-      localStorage.removeItem("user");
-    } catch {}
-    navigate("/home", { replace: true });
+    logout(); // clears localStorage["auth"] and context
+    navigate("/login", { replace: true });
   };
 
   return (
     <>
-      {/* === TOP NAVBAR (one line: hamburger + sign out) === */}
+      {/* === TOP NAVBAR (one line: hamburger + auth area) === */}
       <nav className="navbar" role="navigation" aria-label="Top">
         <div className="navbar-inner">
           <button
@@ -49,13 +55,30 @@ export default function Layout({ children }) {
             <span style={{ fontSize: "1.2rem" }}>☰</span>
           </button>
 
-          {/* keep layout; push sign out to the right */}
           <div style={{ flex: 1 }} />
 
-          {/* NEW: Sign out button (top-right) */}
-          <button className="btn ghost" onClick={handleSignOut}>
-            Sign out
-          </button>
+          {/* Auth area (right) */}
+          {user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {user.picture && (
+                <img
+                  src={user.picture}
+                  alt={user.name || "User"}
+                  width="28"
+                  height="28"
+                  style={{ borderRadius: "50%" }}
+                />
+              )}
+              <span>{user.name || user.email}</span>
+              <button className="btn ghost" onClick={handleSignOut}>
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <Link className="btn" to="/login">
+              Login
+            </Link>
+          )}
         </div>
       </nav>
 

@@ -1,34 +1,70 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 import Layout from "./components/Layout.jsx";
 import MainPage from "./pages/MainPage.jsx";
 import WatchlistPage from "./pages/WatchlistPage.jsx";
-import { WatchlistProvider } from "./state/WatchlistContext.jsx"; // <-- wrap with this!
+import LoginPage from "./components/Login.jsx";
+import { WatchlistProvider } from "./state/WatchlistContext.jsx";
+import { AuthProvider, useAuth } from "./state/AuthContext.jsx";
 import "./css/theme.css";
 
-/* ---- Theme bootstrap: prevents flash ---- */
-(() => {
-  const saved = localStorage.getItem("theme");
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const initial = saved || (prefersDark ? "dark" : "light");
-  document.documentElement.setAttribute("data-theme", initial);
-})();
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+// Guard: only render children if logged in, otherwise go to /login
+function RequireLogin({ children }) {
+  const auth = useAuth();
+  const location = useLocation();
+  if (!auth?.user) return <Navigate to="/login" state={{ from: location }} replace />;
+  return children;
+}
+
+// Root redirect: / -> /home if signed in, else /login
+function RootRedirect() {
+  const auth = useAuth();
+  return <Navigate to={auth?.user ? "/home" : "/login"} replace />;
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <WatchlistProvider>
-      <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/home" replace />} />
-            <Route path="/home" element={<MainPage />} />
-            <Route path="/watchlist" element={<WatchlistPage />} />
-            <Route path="*" element={<Navigate to="/home" replace />} />
-          </Routes>
-        </Layout>
-      </BrowserRouter>
-    </WatchlistProvider>
+    <GoogleOAuthProvider clientId={clientId}>
+      <AuthProvider>
+        <WatchlistProvider>
+          <BrowserRouter>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<RootRedirect />} />
+
+                {/* Public (only page visible when logged out) */}
+                <Route path="/login" element={<LoginPage />} />
+
+                {/* Protected pages */}
+                <Route
+                  path="/home"
+                  element={
+                    <RequireLogin>
+                      <MainPage />
+                    </RequireLogin>
+                  }
+                />
+                <Route
+                  path="/watchlist"
+                  element={
+                    <RequireLogin>
+                      <WatchlistPage />
+                    </RequireLogin>
+                  }
+                />
+
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          </BrowserRouter>
+        </WatchlistProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   </React.StrictMode>
 );
