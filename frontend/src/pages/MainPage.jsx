@@ -15,64 +15,75 @@ export default function MainPage({ user }) {
   const [err, setErr] = useState("");
   const debounceRef = useRef();
 
-  useEffect(() => {
-    if (!q.trim()) {
-      setData([]);
-      setErr("");
-      return;
-    }
+  const doSearch = async (term) => {
     setLoading(true);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await searchMulti(q);
-        setData(res);
-        setErr("");
-      } catch (e) {
-        setErr(e.message || "Fehler bei der Suche");
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
-    return () => clearTimeout(debounceRef.current);
-  }, [q]);
+    setErr("");
+    try {
+      const res = await searchMulti(term);   // res ist ein Array
+      setData(res || []);                    // nicht res.results
+    } catch (e) {
+      setErr("Fehler beim Laden.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (!user) return null;
+  const onChange = (e) => {
+    const term = e.target.value;
+    setQ(term);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (term.trim()) doSearch(term);
+      else setData([]);
+    }, 400);
+  };
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", padding: "24px" }}>
-      <header style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-        <h1 style={{ fontSize: 24, margin: 0 }}>Suche</h1>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Film oder Serie suchen…"
-          style={{
-            flex: 1,
-            minWidth: 260,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-            outline: "none"
-          }}
-        />
-        <Link to="/watchlist" style={{ fontWeight: 700, textDecoration: "none" }}>
-          Watchlist
+    <div
+      style={{
+        fontFamily:
+          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+        padding: 24,
+        maxWidth: 1100,
+        margin: "0 auto",
+        color: "#111827",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <h2 style={{ margin: 0 }}>Suche</h2>
+        <Link to="/watchlist" style={{ color: "#2563eb", textDecoration: "none" }}>
+          Zur Watchlist
         </Link>
-      </header>
+      </div>
 
-      {loading && <div>Suche läuft…</div>}
-      {err && <div style={{ color: "crimson" }}>{err}</div>}
+      <input
+        value={q}
+        onChange={onChange}
+        placeholder="Suchen..."
+        style={{
+          width: "100%",
+          marginTop: 12,
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: "1px solid #e5e7eb",
+          fontSize: 16,
+          outline: "none",
+        }}
+      />
+
+      {loading && <div style={{ marginTop: 12 }}>Laden…</div>}
+      {err && <div style={{ marginTop: 12, color: "#b91c1c" }}>{err}</div>}
 
       <div
         style={{
+          marginTop: 16,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 16
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: 16,
         }}
       >
         {data.map((item) => (
-          <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
+          <MediaCard key={`${item.media_type}-${item.id}`} item={item} showRate={false} />
         ))}
       </div>
 
