@@ -1,8 +1,12 @@
 import React from "react";
 import { posterUrl } from "../api/tmdb";
 import { useWatchlist } from "../state/WatchlistContext.jsx";
+<<<<<<< HEAD
 import { useRatings } from "../state/RatingsContext.jsx";
 import RateModal from "./RateModal.jsx";
+=======
+import "../css/theme.css";
+>>>>>>> d5e100757772b7dcaa8e8e67aeb1feaf8d810fad
 
 export default function MediaCard({ item, showRate = false }) {
   const { add, remove, isInList } = useWatchlist();
@@ -20,7 +24,16 @@ export default function MediaCard({ item, showRate = false }) {
     title,
     poster_path: item.poster_path,
     release_date: item.release_date,
+<<<<<<< HEAD
     overview: item.overview,
+=======
+    first_air_date: item.first_air_date,
+  };
+
+  const toggle = () => {
+    if (inList) remove(media_type, id);
+    else add(entry);
+>>>>>>> d5e100757772b7dcaa8e8e67aeb1feaf8d810fad
   };
 
   const [open, setOpen] = React.useState(false);
@@ -28,6 +41,7 @@ export default function MediaCard({ item, showRate = false }) {
   const stars = rated ? "★".repeat(rated.rating) + "☆".repeat(5 - rated.rating) : null;
 
   return (
+<<<<<<< HEAD
     <div
       style={{
         border: "1px solid #e5e7eb",
@@ -97,6 +111,32 @@ export default function MediaCard({ item, showRate = false }) {
               Titel bewerten
             </button>
           )}
+=======
+    <div className="media-card card" role="group" aria-label={title}>
+      <div className="poster-wrap" onClick={()=>window.dispatchEvent(new CustomEvent("detail-open",{detail:item}))} style={{cursor:"pointer"}}>
+        {poster ? (
+          <img src={poster} alt={title} className="poster" loading="lazy" />
+        ) : (
+          <div className="poster placeholder">No Image</div>
+        )}
+      </div>
+
+      <div className="content">
+        <h3 className="title" onClick={()=>window.dispatchEvent(new CustomEvent("detail-open",{detail:item}))} style={{cursor:"pointer"}}>{title}</h3>
+        <div className="meta">
+          <span className="pill">{(media_type || "").toUpperCase()}</span>
+          {date && <span className="date">{date}</span>}
+        </div>
+
+        <div className="actions">
+          <button
+            onClick={toggle}
+            className={"btn " + (inList ? "danger" : "primary")}
+            aria-pressed={inList}
+          >
+            {inList ? "Aus Watchlist entfernen" : "Zur Watchlist"}
+          </button>
+>>>>>>> d5e100757772b7dcaa8e8e67aeb1feaf8d810fad
         </div>
       </div>
 
