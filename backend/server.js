@@ -4,7 +4,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 import { OAuth2Client } from "google-auth-library";
-import jwt from "jsonwebtoken";
 
 dotenv.config();
 
@@ -17,43 +16,42 @@ app.use(express.json());
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Helper: verify Google ID token and return user info
+async function verifyGoogleIdToken(idToken) {
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+  if (!payload?.sub || !payload?.email) {
+    throw new Error("Invalid Google token payload");
+  }
+
+  return {
+    id: payload.sub,
+    email: payload.email,
+    name: payload.name,
+    picture: payload.picture,
+  };
+}
+
 // POST /auth/google
 // Body: { credential: "<Google ID token from frontend>" }
 app.post("/auth/google", async (req, res) => {
   try {
     const { credential } = req.body || {};
-    if (!credential) return res.status(400).json({ error: "Missing credential" });
-
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload(); // { sub, email, name, picture, ... }
-    if (!payload?.sub || !payload?.email) {
-      return res.status(401).json({ error: "Invalid Google token" });
+    if (!credential) {
+      return res.status(400).json({ error: "Missing credential" });
     }
 
-    // Create our own short JWT so the frontend can stay logged in
-    const sessionToken = jwt.sign(
-      {
-        sub: payload.sub,
-        email: payload.email,
-        name: payload.name,
-        picture: payload.picture,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const user = await verifyGoogleIdToken(credential);
 
+    // We DON'T create our own JWT anymore.
+    // Just return the Google ID token so the frontend can send it back as Bearer.
     return res.json({
-      user: {
-        id: payload.sub,
-        email: payload.email,
-        name: payload.name,
-        picture: payload.picture,
-      },
-      token: sessionToken,
+      user,
+      token: credential,
     });
   } catch (err) {
     console.error("Google auth failed:", err);
@@ -61,26 +59,37 @@ app.post("/auth/google", async (req, res) => {
   }
 });
 
-// (Optional) Auth check middleware for future protected APIs
-function requireAuth(req, res, next) {
-  const auth = req.headers.authorization || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token) return res.status(401).json({ error: "Missing token" });
+// Auth check middleware for protected APIs
+// Expects: Authorization: Bearer <Google ID token>
+async function requireAuth(req, res, next) {
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: "Missing token" });
+    }
+
+    const user = await verifyGoogleIdToken(token);
+    req.user = user; // attach for later use if needed
     next();
-  } catch {
+  } catch (err) {
+    console.error("Auth failed:", err);
     return res.status(401).json({ error: "Invalid token" });
   }
 }
 
-// Example protected proxy to TMDB (only if you later need it)
+// Protected proxy to TMDB
 app.get("/api/tmdb/*", requireAuth, async (req, res) => {
   try {
-    const url = `https://api.themoviedb.org/3/${req.params[0]}${req.url.split("?")[1] ? "?" + req.url.split("?")[1] : ""}`;
+    const path = req.params[0];
+    const query = req.url.includes("?") ? "?" + req.url.split("?")[1] : "";
+    const url = `https://api.themoviedb.org/3/${path}${query}`;
+
     const r = await fetch(url, {
-      headers: { Authorization: `Bearer ${process.env.TMDB_BEARER}` },
+      // Your .env already contains "Bearer <token>"
+      headers: { Authorization: process.env.TMDB_BEARER },
     });
+
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (e) {
