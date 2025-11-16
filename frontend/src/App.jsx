@@ -10,9 +10,36 @@ function App() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
-  const handleLogin = (userData) => {
-    setUser(userData);
-    navigate("/home");
+  // Load stored user if available
+  const [user, setUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Persist user changes
+  useEffect(() => {
+    if (user) localStorage.setItem("user", JSON.stringify(user));
+    else localStorage.removeItem("user");
+  }, [user]);
+
+  // Handle Google login success
+  const handleLogin = (u) => {
+    setUser(u);
+    navigate("/home", { replace: true });
+  };
+
+  // Handle sign out
+  const handleSignOut = () => {
+    try {
+      window.google?.accounts.id.disableAutoSelect();
+    } catch {}
+    localStorage.removeItem("user");
+    setUser(null);
+    navigate("/home", { replace: true });
   };
 
   return (
@@ -25,5 +52,3 @@ function App() {
     </Routes>
   );
 }
-
-export default App;

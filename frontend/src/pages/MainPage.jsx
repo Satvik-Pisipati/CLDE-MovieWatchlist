@@ -1,10 +1,32 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { searchMulti } from "../api/tmdb";
-import MediaCard from "../components/MediaCard";
+import { useEffect, useMemo, useState } from "react";
+import MediaCard from "../components/MediaCard.jsx";
+import SkeletonCard from "../components/SkeletonCard.jsx";
+import FiltersBar from "../components/FiltersBar.jsx";
+import DetailsModal from "../components/DetailsModal.jsx";
+import {
+  searchTMDB,
+  trendingTMDB,
+  recommendationsFromWatchlist,
+  getGenres,
+} from "../api/tmdb.js";
+import { useWatchlist } from "../state/WatchlistContext.jsx";
 
-export default function MainPage({ user }) {
-  const navigate = useNavigate();
+export default function MainPage() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [trending, setTrending] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [sort, setSort] = useState("popularity");
+  const [type, setType] = useState("all");
+  const [category, setCategory] = useState("all");
+  const [categories, setCategories] = useState([]);
+
+  const [open, setOpen] = useState(null);
+  const { list, add, remove, isInList } = useWatchlist();
+
+  // --- Load trending + categories initially ---
   useEffect(() => {
     if (!user) navigate("/"); // weiterhin Login-Gate
   }, [user, navigate]);
@@ -87,9 +109,12 @@ export default function MainPage({ user }) {
         ))}
       </div>
 
-      {!loading && !err && q.trim() && data.length === 0 && (
-        <div style={{ marginTop: 24, color: "#6b7280" }}>Keine Treffer.</div>
-      )}
+      <DetailsModal
+        item={open}
+        onClose={() => setOpen(null)}
+        onToggleList={toggle}
+        inList={inList}
+      />
     </div>
   );
 }

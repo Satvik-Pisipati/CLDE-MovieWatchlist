@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useWatchlist } from "../state/WatchlistContext.jsx";
 import MediaCard from "../components/MediaCard";
 import { useRatings } from "../state/RatingsContext.jsx";
@@ -10,10 +10,28 @@ export default function WatchlistPage({ user }) {
   const { hasAny } = useRatings();
 
   useEffect(() => {
-    if (!user) navigate("/");
-  }, [user, navigate]);
+    const onOpen = (e) => setOpen(e.detail);
+    window.addEventListener("detail-open", onOpen);
+    return () => window.removeEventListener("detail-open", onOpen);
+  }, []);
 
-  if (!user) return null;
+  const inList =
+    open && typeof isInList === "function"
+      ? isInList(open.media_type, open.id)
+      : false;
+
+  const toggle = () => {
+    if (!open || !add || !remove) return;
+    if (inList) {
+      remove(open.media_type, open.id);
+    } else {
+      // store the full object so popup from watchlist has overview, etc.
+      add({
+        ...open,
+        title: open.title || open.name,
+      });
+    }
+  };
 
   return (
     <div
