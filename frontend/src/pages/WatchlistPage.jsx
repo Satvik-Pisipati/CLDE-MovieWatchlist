@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useWatchlist } from "../state/WatchlistContext.jsx";
-import MediaCard from "../components/MediaCard";
-import { useRatings } from "../state/RatingsContext.jsx";
+import MediaCard from "../components/MediaCard.jsx";
+import DetailsModal from "../components/DetailsModal.jsx";
+import RatingModal from "../components/RatingModal.jsx";
 
-export default function WatchlistPage({ user }) {
-  const navigate = useNavigate();
-  const { items } = useWatchlist();
-  const { hasAny } = useRatings();
+export default function WatchlistPage() {
+  const ctx = useWatchlist();
+  const entries = ctx?.list || [];
+  const { add, remove, isInList } = ctx || {};
+
+  const [open, setOpen] = useState(null);
 
   useEffect(() => {
     const onOpen = (e) => setOpen(e.detail);
@@ -25,7 +28,6 @@ export default function WatchlistPage({ user }) {
     if (inList) {
       remove(open.media_type, open.id);
     } else {
-      // store the full object so popup from watchlist has overview, etc.
       add({
         ...open,
         title: open.title || open.name,
@@ -34,69 +36,53 @@ export default function WatchlistPage({ user }) {
   };
 
   return (
-    <div
-      style={{
-        fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-        padding: 24,
-        maxWidth: 1100,
-        margin: "0 auto",
-        color: "#111827",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h2 style={{ margin: 0 }}>Meine Watchlist</h2>
-        <div style={{ display: "flex", gap: 16 }}>
-          <Link to="/home" style={{ color: "#2563eb", textDecoration: "none" }}>
+    <div className="container page-wrap" style={{ paddingTop: "1rem" }}>
+      <section className="results">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <h1
+            className="section-title"
+            style={{ fontSize: "1.6rem", margin: 0 }}
+          >
+            Deine Watchlist
+          </h1>
+          <Link to="/home" className="btn ghost">
             Zur Suche
           </Link>
-          {hasAny && (
-            <Link to="/ratings" style={{ color: "#2563eb", textDecoration: "none" }}>
-              Meine Bewertungen
-            </Link>
-          )}
         </div>
-      </div>
 
-      {items.length === 0 ? (
-        <div
-          style={{
-            marginTop: 12,
-            color: "#6b7280",
-            border: "1px dashed #e5e7eb",
-            padding: 16,
-            borderRadius: 12,
-            background: "#fff",
-          }}
-        >
-          Deine Watchlist ist leer. Füge Titel über die Suche hinzu.
-        </div>
-      ) : (
-        <div
-          style={{
-            marginTop: 16,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: 16,
-          }}
-        >
-          {items.map((it) => (
-            <MediaCard
-              key={`${it.media_type}-${it.id}`}
-              item={{
-                id: it.id,
-                media_type: it.media_type,
-                title: it.title, // für movie compat
-                name: it.title, // für tv compat
-                poster_path: it.poster_path,
-                release_date: it.release_date,
-                overview: it.overview,
-              }}
-              showRate
-            />
-          ))}
-        </div>
-      )}
+        {entries.length === 0 ? (
+          <div className="card empty-state" style={{ padding: "1rem" }}>
+            Deine Watchlist ist leer. Füge Titel über die Suche hinzu.
+            <div style={{ marginTop: 12 }}>
+              <Link to="/home" className="btn primary">
+                Jetzt suchen
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="media-grid">
+            {entries.map((it) => (
+              <MediaCard key={`${it.media_type}-${it.id}`} item={it} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <DetailsModal
+        item={open}
+        onClose={() => setOpen(null)}
+        onToggleList={toggle}
+        inList={inList}
+      />
+      <RatingModal />
     </div>
   );
 }

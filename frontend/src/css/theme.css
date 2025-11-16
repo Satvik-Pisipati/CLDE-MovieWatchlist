@@ -89,7 +89,6 @@ a{color:var(--brand);text-decoration:none}
   );
 }
 
-/* Ghost button */
 .btn.ghost{
   background: transparent;
   border: 1px solid color-mix(in oklab, var(--border) 100%, transparent);
@@ -169,30 +168,47 @@ a{color:var(--brand);text-decoration:none}
 .drawer-footer{margin-top:auto;padding:8px;border-top:1px solid var(--border)}
 .drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50}
 
-/* =============== GRID & CARDS =============== */
+/* =============== GRID & CARDS (UPDATED) =============== */
 .media-grid{
   display:grid;
+  gap:12px;
+  justify-items:center;
   grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-  gap:16px;
 }
-.media-card{display:flex;flex-direction:column;height:100%;overflow:hidden}
+
+.media-card{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  max-width:275px;
+  height:520px;
+  overflow:hidden;
+}
+
 .media-card .poster{
   width:100%;
-  aspect-ratio:2/3;
+  height:340px;
   object-fit:cover;
   display:block;
   border-top-left-radius:var(--radius);
   border-top-right-radius:var(--radius);
 }
+
 .media-card .poster.placeholder{
   display:flex;align-items:center;justify-content:center;
   color:var(--muted);
   background:color-mix(in oklab, white 6%, transparent);
-  aspect-ratio:2/3;
+  height:340px;
 }
-.media-card .content{display:flex;flex-direction:column;gap:.25rem;padding:12px 14px;flex:1}
 
-/* ⭐ SINGLE-LINE TITLE WITH ELLIPSIS ON CARDS */
+.media-card .content{
+  display:flex;
+  flex-direction:column;
+  gap:.25rem;
+  padding:12px 14px;
+  flex:1;
+}
+
 .media-card .title{
   font-weight:800;
   margin:4px 0;
@@ -202,7 +218,14 @@ a{color:var(--brand);text-decoration:none}
   text-overflow:ellipsis;
 }
 
-.media-card .meta{display:flex;gap:.6rem;align-items:center;color:var(--muted);font-size:.92rem}
+.media-card .meta{
+  display:flex;
+  gap:.6rem;
+  align-items:center;
+  color:var(--muted);
+  font-size:.92rem;
+}
+
 .media-card .pill{
   font-size:.7rem;font-weight:700;
   padding:.2rem .5rem;border-radius:999px;
@@ -210,8 +233,20 @@ a{color:var(--brand);text-decoration:none}
   border:1px solid color-mix(in oklab, var(--brand-2) 35%, transparent);
   color:var(--text);
 }
-.media-card .actions{margin-top:auto}
-.media-card .btn{width:100%;justify-content:center}
+
+/* stack buttons vertically */
+.media-card .actions{
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.media-card .btn{
+  width:100%;
+  justify-content:center;
+  white-space:nowrap;
+}
 
 /* =============== MODAL =============== */
 .modal-overlay{
@@ -224,7 +259,6 @@ a{color:var(--brand);text-decoration:none}
   z-index:50;
 }
 
-/* solid modal */
 .modal{
   max-width:900px;
   width:100%;

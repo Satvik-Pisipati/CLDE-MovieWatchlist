@@ -1,112 +1,143 @@
-import React from "react";
-import { posterUrl } from "../api/tmdb";
 import { useWatchlist } from "../state/WatchlistContext.jsx";
 import { useRatings } from "../state/RatingsContext.jsx";
-import RateModal from "./RateModal.jsx";
 
-export default function MediaCard({ item, showRate = false }) {
-  const { add, remove, isInList } = useWatchlist();
-  const { get } = useRatings();
-  const media_type = item.media_type; // "movie" | "tv"
-  const id = item.id;
-  const title = media_type === "movie" ? item.title : item.name;
-  const date = item.release_date || item.first_air_date || "";
-  const poster = posterUrl(item.poster_path, "w342");
-  const inList = isInList(media_type, id);
+const IMG_BASE = "https://image.tmdb.org/t/p/w500";
 
-  const entry = {
+export default function MediaCard({ item }) {
+  const watch = useWatchlist() || {};
+  const ratings = useRatings() || {};
+
+  if (!item) return null;
+
+  const {
     id,
-    media_type,
+    media_type = "movie",
     title,
-    poster_path: item.poster_path,
-    release_date: item.release_date,
-    overview: item.overview,
+    name,
+    poster_path,
+    release_date,
+    first_air_date,
+    vote_average,
+  } = item;
+
+  const displayTitle = title || name || "Unbenannt";
+  const date = release_date || first_air_date || "";
+
+  const inList = watch.isInList
+    ? watch.isInList(media_type, id)
+    : false;
+
+  const existingRating = ratings.getRating
+    ? ratings.getRating(media_type, id)
+    : null;
+
+  // --- OPEN DETAILS ---
+  const openDetails = () => {
+    window.dispatchEvent(
+      new CustomEvent("detail-open", {
+        detail: {
+          ...item,
+          media_type,
+          title: displayTitle,
+        },
+      })
+    );
   };
 
-  const [open, setOpen] = React.useState(false);
-  const rated = get(media_type, id);
-  const stars = rated ? "★".repeat(rated.rating) + "☆".repeat(5 - rated.rating) : null;
+  // --- OPEN RATING POPUP ---
+  const openRating = (e) => {
+    e.stopPropagation();
+    window.dispatchEvent(
+      new CustomEvent("rating-open", {
+        detail: {
+          ...item,
+          media_type,
+          title: displayTitle,
+        },
+      })
+    );
+  };
+
+  // --- ADD / REMOVE WATCHLIST ---
+  const toggleWatchlist = (e) => {
+    e.stopPropagation();
+    if (!watch.add || !watch.remove) return;
+
+    if (inList) {
+      watch.remove(media_type, id);
+    } else {
+      watch.add({
+        ...item,
+        media_type,
+        title: displayTitle,
+      });
+    }
+  };
 
   return (
-    <div
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 12,
-        background: "white",
-        display: "flex",
-        gap: 12,
-        fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          width: 90,
-          height: 135,
-          background: "#f3f4f6",
-          borderRadius: 8,
-          overflow: "hidden",
-          flex: "0 0 auto",
-        }}
-      >
-        {poster ? (
-          <img
-            src={poster}
-            alt="Poster"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : null}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700 }}>{title}</div>
-        <div style={{ color: "#6b7280", fontSize: 14, marginTop: 2 }}>
-          {media_type === "movie" ? "Movie" : "Serie"}{" "}
-          {date ? `· ${date.slice(0, 4)}` : ""}
+    <article className="card media-card" onClick={openDetails}>
+      {/* IMAGE */}
+      {poster_path ? (
+        <img
+          className="poster"
+          src={`${IMG_BASE}${poster_path}`}
+          alt={displayTitle}
+          loading="lazy"
+        />
+      ) : (
+        <div className="poster placeholder">Kein Bild</div>
+      )}
+
+      {/* CONTENT */}
+      <div className="content">
+        <h3 className="title" title={displayTitle}>
+          {displayTitle}
+        </h3>
+
+        {/* META INFORMATION */}
+        <div className="meta">
+          <span className="pill">
+            {media_type === "tv" ? "SERIES" : "MOVIE"}
+          </span>
+
+          {date && <span>{date}</span>}
+
+          {vote_average != null && (
+            <span>★ {vote_average.toFixed(1)}</span>
+          )}
         </div>
 
-        {stars && <div style={{ marginTop: 8, fontSize: 18 }}>{stars}</div>}
-
-        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {/* ACTIONS → vertical stacked buttons */}
+        <div
+          className="actions"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            marginTop: 8,
+          }}
+        >
+          {/* WATCHLIST BUTTON */}
           <button
-            onClick={() => (inList ? remove(media_type, id) : add(entry))}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 10,
-              border: "1px solid #e5e7eb",
-              background: inList ? "#fee2e2" : "#ecfeff",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
+            className={`btn ${inList ? "" : "primary"}`}
+            onClick={toggleWatchlist}
+            style={{ width: "100%" }}
           >
             {inList ? "Aus Watchlist entfernen" : "Zur Watchlist"}
           </button>
 
-          {inList && showRate && (
-            <button
-              onClick={() => setOpen(true)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                background: "#ecfeff",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Titel bewerten
-            </button>
-          )}
+          {/* RATING BUTTON */}
+          <button
+            className="btn ghost"
+            onClick={openRating}
+            style={{ width: "100%" }}
+          >
+            {existingRating != null
+              ? `Bewertet: ${existingRating}/5 ⭐`
+              : "Bewerten"}
+          </button>
         </div>
       </div>
-
-      {showRate && (
-        <RateModal
-          open={open}
-          onClose={() => setOpen(false)}
-          media={{ ...entry, name: title, title }}
-        />
-      )}
-    </div>
+    </article>
   );
 }

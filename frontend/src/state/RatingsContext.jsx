@@ -1,48 +1,70 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 const RatingsContext = createContext(null);
-const LS_KEY = "ratings_v1";
-
-function keyOf(media_type, id) {
-  return `${media_type}-${id}`;
-}
+const STORAGE_KEY = "moviewatchlist:ratings";
 
 export function RatingsProvider({ children }) {
-  const [ratings, setRatings] = useState(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [ratings, setRatings] = useState([]); // [{ id, media_type, rating, ...item }]
 
   useEffect(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(ratings));
-    } catch {}
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) setRatings(parsed);
+    } catch (err) {
+      console.error("Failed to load ratings:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
+    } catch (err) {
+      console.error("Failed to save ratings:", err);
+    }
   }, [ratings]);
 
-  const get = (media_type, id) => ratings[keyOf(media_type, id)] || null;
-
-  const set = (media, value) => {
-    const now = new Date().toISOString();
-    const { media_type, id, title, name, poster_path, release_date, first_air_date, overview } = media;
-    setRatings((prev) => ({
-      ...prev,
-      [keyOf(media_type, id)]: { rating: value, date: now, media_type, id, title, name, poster_path, release_date, first_air_date, overview },
-    }));
+  const rate = (item, rating) => {
+    if (!item || !item.id || !item.media_type) return;
+    const safeRating = Math.max(0, Math.min(10, rating));
+    setRatings((prev) => {
+      const idx = prev.findIndex(
+        (r) => r.id === item.id && r.media_type === item.media_type
+      );
+      const withMeta = {
+        ...item,
+        media_type: item.media_type,
+        title: item.title || item.name,
+        rating: safeRating,
+      };
+      if (idx === -1) return [...prev, withMeta];
+      const copy = [...prev];
+      copy[idx] = withMeta;
+      return copy;
+    });
   };
 
-  const hasAny = Object.keys(ratings).length > 0;
+  const unrate = (media_type, id) => {
+    setRatings((prev) =>
+      prev.filter((r) => !(r.id === id && r.media_type === media_type))
+    );
+  };
 
-  const value = useMemo(() => ({ ratings, get, set, hasAny }), [ratings, hasAny]);
+  const getRating = (media_type, id) => {
+    const found = ratings.find(
+      (r) => r.id === id && r.media_type === media_type
+    );
+    return found?.rating ?? null;
+  };
 
-  return <RatingsContext.Provider value={value}>{children}</RatingsContext.Provider>;
+  return (
+    <RatingsContext.Provider value={{ ratings, rate, unrate, getRating }}>
+      {children}
+    </RatingsContext.Provider>
+  );
 }
 
 export function useRatings() {
-  const ctx = useContext(RatingsContext);
-  if (!ctx) throw new Error("useRatings must be used within RatingsProvider");
-  return ctx;
+  return useContext(RatingsContext);
 }

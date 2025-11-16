@@ -1,142 +1,76 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRatings } from "../state/RatingsContext.jsx";
-import RateModal from "../components/RateModal.jsx";
+import MediaCard from "../components/MediaCard.jsx";
+import DetailsModal from "../components/DetailsModal.jsx";
+import RatingModal from "../components/RatingModal.jsx";
+import { useWatchlist } from "../state/WatchlistContext.jsx";
 
 export default function MyRatingsPage() {
-  const { ratings } = useRatings();
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(null);
+  const { ratings } = useRatings() || { ratings: [] };
+  const watch = useWatchlist() || {};
+  const [open, setOpen] = useState(null);
 
-  const items = Object.values(ratings).sort((a, b) =>
-    (b.date || "").localeCompare(a.date || "")
-  );
+  useEffect(() => {
+    const onOpen = (e) => setOpen(e.detail);
+    window.addEventListener("detail-open", onOpen);
+    return () => window.removeEventListener("detail-open", onOpen);
+  }, []);
+
+  const inList =
+    open && watch.isInList
+      ? watch.isInList(open.media_type, open.id)
+      : false;
+
+  const toggle = () => {
+    if (!open || !watch.add || !watch.remove) return;
+    if (inList) watch.remove(open.media_type, open.id);
+    else watch.add({ ...open, title: open.title || open.name });
+  };
 
   return (
-    <div
-      style={{
-        padding: 20,
-        fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-        color: "#111827",
-        maxWidth: 1100,
-        margin: "0 auto",
-      }}
-    >
-      {/* Header mit Links zu Suche und Watchlist */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          marginBottom: 12,
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Meine Bewertungen</h2>
-        <div style={{ display: "flex", gap: 16 }}>
-          <Link to="/home" style={{ color: "#2563eb", textDecoration: "none" }}>
-            Zur Suche
-          </Link>
-          <Link
-            to="/watchlist"
-            style={{ color: "#2563eb", textDecoration: "none" }}
-          >
-            Zur Watchlist
-          </Link>
-        </div>
-      </div>
-
-      {items.length === 0 ? (
-        <p
-          style={{
-            color: "#6b7280",
-            border: "1px dashed #e5e7eb",
-            padding: 16,
-            borderRadius: 12,
-            background: "#fff",
-          }}
-        >
-          Noch keine Bewertungen. Füge zuerst Titel zur Watchlist hinzu und
-          bewerte sie.
-        </p>
-      ) : (
+    <div className="container page-wrap" style={{ paddingTop: "1rem" }}>
+      <section className="results">
         <div
           style={{
-            marginTop: 16,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 12,
           }}
         >
-          {items.map((r) => {
-            const key = `${r.media_type}-${r.id}`;
-            const date = r.date ? new Date(r.date).toLocaleDateString() : "";
-            const title = r.title || r.name;
-            return (
-              <div
-                key={key}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: "white",
-                  display: "flex",
-                  gap: 12,
-                }}
-              >
-                <div
-                  style={{
-                    width: 90,
-                    height: 135,
-                    background: "#f3f4f6",
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    flex: "0 0 auto",
-                  }}
-                >
-                  {r.poster_path ? (
-                    <img
-                      src={`https://image.tmdb.org/t/p/w342/${r.poster_path}`}
-                      alt="Poster"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  ) : null}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700 }}>{title}</div>
-                  <div style={{ color: "#6b7280", fontSize: 14, marginTop: 2 }}>
-                    {r.media_type === "movie" ? "Movie" : "Serie"} · {date}
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 18 }}>
-                    {"★".repeat(r.rating)}
-                    {"☆".repeat(5 - r.rating)}
-                  </div>
-                  <div style={{ marginTop: 12 }}>
-                    <button
-                      onClick={() => {
-                        setActive(r);
-                        setOpen(true);
-                      }}
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #e5e7eb",
-                        background: "#ecfeff",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Bewertung ändern
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <h1
+            className="section-title"
+            style={{ fontSize: "1.6rem", margin: 0 }}
+          >
+            Meine Bewertungen
+          </h1>
+          <Link to="/home" className="btn ghost">
+            Zur Suche
+          </Link>
         </div>
-      )}
 
-      <RateModal open={open} onClose={() => setOpen(false)} media={active} />
+        {ratings.length === 0 ? (
+          <div className="card empty-state" style={{ padding: "1rem" }}>
+            Du hast noch nichts bewertet.
+          </div>
+        ) : (
+          <div className="media-grid">
+            {ratings.map((it) => (
+              <MediaCard key={`${it.media_type}-${it.id}`} item={it} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <DetailsModal
+        item={open}
+        onClose={() => setOpen(null)}
+        onToggleList={toggle}
+        inList={inList}
+      />
+      <RatingModal />
     </div>
   );
 }
