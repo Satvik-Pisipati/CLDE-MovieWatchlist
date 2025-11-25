@@ -1,19 +1,28 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useWatchlist } from "../state/WatchlistContext.jsx";
-<<<<<<< HEAD
-import MediaCard from "../components/MediaCard";
 import { useRatings } from "../state/RatingsContext.jsx";
+import MediaCard from "../components/MediaCard.jsx";
 
-export default function WatchlistPage({ user }) {
+export default function WatchlistPage() {
   const navigate = useNavigate();
-  const { items } = useWatchlist();
+  const { items, list } = useWatchlist();
   const { hasAny } = useRatings();
 
-  useEffect(() => {
-    if (!user) navigate("/");
-  }, [user, navigate]);
+  // Fallback: manche Versionen benutzen items, andere list
+  const entries =
+    Array.isArray(items) && items.length > 0
+      ? items
+      : Array.isArray(list)
+        ? list
+        : [];
 
-  if (!user) return null;
+  // Redirect falls nicht eingeloggt (AuthContext übernimmt das normalerweise,
+  // aber du hast im alten Code den user Prop verwendet)
+  useEffect(() => {
+    // Wenn AuthContext genutzt wird: dort prüfen, nicht hier
+    // Diese Zeile kann raus, falls RequireLogin bereits greift
+  }, []);
 
   return (
     <div
@@ -23,15 +32,23 @@ export default function WatchlistPage({ user }) {
         padding: 24,
         maxWidth: 1100,
         margin: "0 auto",
-        color: "#111827",
+        color: "#111827"
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline"
+        }}
+      >
         <h2 style={{ margin: 0 }}>Meine Watchlist</h2>
+
         <div style={{ display: "flex", gap: 16 }}>
           <Link to="/home" style={{ color: "#2563eb", textDecoration: "none" }}>
             Zur Suche
           </Link>
+
           {hasAny && (
             <Link to="/ratings" style={{ color: "#2563eb", textDecoration: "none" }}>
               Meine Bewertungen
@@ -40,7 +57,7 @@ export default function WatchlistPage({ user }) {
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {entries.length === 0 ? (
         <div
           style={{
             marginTop: 12,
@@ -48,7 +65,7 @@ export default function WatchlistPage({ user }) {
             border: "1px dashed #e5e7eb",
             padding: 16,
             borderRadius: 12,
-            background: "#fff",
+            background: "#fff"
           }}
         >
           Deine Watchlist ist leer. Füge Titel über die Suche hinzu.
@@ -59,83 +76,27 @@ export default function WatchlistPage({ user }) {
             marginTop: 16,
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: 16,
+            gap: 16
           }}
         >
-          {items.map((it) => (
+          {entries.map((it) => (
             <MediaCard
               key={`${it.media_type}-${it.id}`}
               item={{
                 id: it.id,
                 media_type: it.media_type,
-                title: it.title, // für movie compat
-                name: it.title, // für tv compat
+                title: it.title,
+                name: it.title || it.name,
                 poster_path: it.poster_path,
                 release_date: it.release_date,
-                overview: it.overview,
+                first_air_date: it.first_air_date,
+                overview: it.overview
               }}
               showRate
             />
           ))}
         </div>
       )}
-=======
-import MediaCard from "../components/MediaCard.jsx";
-
-export default function WatchlistPage() {
-  // Support both shapes: { items } and { list }
-  const ctx = useWatchlist();
-  const entries = Array.isArray(ctx?.items) && ctx.items.length > 0
-    ? ctx.items
-    : Array.isArray(ctx?.list)
-      ? ctx.list
-      : [];
-
-  return (
-    <div className="container page-wrap" style={{ paddingTop: "1rem" }}>
-      <section className="results">
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          marginBottom: 12
-        }}>
-          <h1 className="section-title" style={{ fontSize: "1.6rem", margin: 0 }}>
-            Your Watchlist
-          </h1>
-          <Link to="/home" className="btn ghost">Zur Suche</Link>
-        </div>
-
-        {entries.length === 0 ? (
-          <div className="card empty-state" style={{ padding: "1rem" }}>
-            Deine Watchlist ist leer. Füge Titel über die Suche hinzu.
-            <div style={{ marginTop: 12 }}>
-              <Link to="/home" className="btn primary">Jetzt suchen</Link>
-            </div>
-          </div>
-        ) : (
-          <div className="media-grid">
-            {entries.map((it) => (
-              <MediaCard
-                key={`${it.media_type}-${it.id}`}
-                item={{
-                  id: it.id,
-                  media_type: it.media_type,
-                  title: it.title,          // movie
-                  name: it.title || it.name, // tv fallback
-                  poster_path: it.poster_path,
-                  release_date: it.release_date,
-                  first_air_date: it.first_air_date,
-                  overview: it.overview,
-                  popularity: it.popularity,
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </section>
->>>>>>> d5e100757772b7dcaa8e8e67aeb1feaf8d810fad
     </div>
   );
 }

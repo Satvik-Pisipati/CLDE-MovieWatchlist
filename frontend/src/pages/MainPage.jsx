@@ -3,12 +3,14 @@ import MediaCard from "../components/MediaCard.jsx";
 import SkeletonCard from "../components/SkeletonCard.jsx";
 import FiltersBar from "../components/FiltersBar.jsx";
 import DetailsModal from "../components/DetailsModal.jsx";
+
 import {
   searchTMDB,
   trendingTMDB,
   recommendationsFromWatchlist,
   getGenres,
 } from "../api/tmdb.js";
+
 import { useWatchlist } from "../state/WatchlistContext.jsx";
 
 export default function MainPage() {
@@ -24,9 +26,10 @@ export default function MainPage() {
   const [categories, setCategories] = useState([]);
 
   const [open, setOpen] = useState(null);
+
   const { list, add, remove, isInList } = useWatchlist();
 
-  // --- Load trending + categories initially ---
+  // Load trending and genre categories
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -40,79 +43,7 @@ export default function MainPage() {
     })();
   }, []);
 
-<<<<<<< HEAD
-  const doSearch = async (term) => {
-    setLoading(true);
-    setErr("");
-    try {
-      const res = await searchMulti(term);   // res ist ein Array
-      setData(res || []);                    // nicht res.results
-    } catch (e) {
-      setErr("Fehler beim Laden.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onChange = (e) => {
-    const term = e.target.value;
-    setQ(term);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      if (term.trim()) doSearch(term);
-      else setData([]);
-    }, 400);
-  };
-
-  return (
-    <div
-      style={{
-        fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-        padding: 24,
-        maxWidth: 1100,
-        margin: "0 auto",
-        color: "#111827",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h2 style={{ margin: 0 }}>Suche</h2>
-        <Link to="/watchlist" style={{ color: "#2563eb", textDecoration: "none" }}>
-          Zur Watchlist
-        </Link>
-      </div>
-
-      <input
-        value={q}
-        onChange={onChange}
-        placeholder="Suchen..."
-        style={{
-          width: "100%",
-          marginTop: 12,
-          padding: "12px 14px",
-          borderRadius: 12,
-          border: "1px solid #e5e7eb",
-          fontSize: 16,
-          outline: "none",
-        }}
-      />
-
-      {loading && <div style={{ marginTop: 12 }}>Laden…</div>}
-      {err && <div style={{ marginTop: 12, color: "#b91c1c" }}>{err}</div>}
-
-      <div
-        style={{
-          marginTop: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-          gap: 16,
-        }}
-      >
-        {data.map((item) => (
-          <MediaCard key={`${item.media_type}-${item.id}`} item={item} showRate={false} />
-        ))}
-=======
-  // --- Generate suggestions based on watchlist ---
+  // Suggestions based on watchlist
   useEffect(() => {
     (async () => {
       if (!list || list.length === 0) {
@@ -124,7 +55,7 @@ export default function MainPage() {
     })();
   }, [list]);
 
-  // --- Live search (debounced) ---
+  // Debounced search
   useEffect(() => {
     const q = query.trim();
     if (!q) {
@@ -133,6 +64,7 @@ export default function MainPage() {
       return;
     }
     setLoading(true);
+
     const timeout = setTimeout(async () => {
       try {
         const data = await searchTMDB(q);
@@ -141,10 +73,10 @@ export default function MainPage() {
         setLoading(false);
       }
     }, 350);
+
     return () => clearTimeout(timeout);
   }, [query]);
 
-  // --- Handle search submit ---
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (!query.trim()) {
@@ -153,19 +85,17 @@ export default function MainPage() {
     }
   };
 
-  // --- Computed lists ---
   const showingResults = results.length > 0 && query.trim().length > 0;
   const baseList = showingResults ? results : trending;
 
+  // Unified filter and sort
   const visible = useMemo(() => {
     let filtered = baseList;
 
-    // Type filter
     if (type !== "all") {
       filtered = filtered.filter((i) => i.media_type === type);
     }
 
-    // Category filter
     if (category !== "all") {
       const cid = Number(category);
       filtered = filtered.filter(
@@ -173,24 +103,28 @@ export default function MainPage() {
       );
     }
 
-    // Sorting
     const sorted = [...filtered].sort((a, b) => {
-      if (sort === "title")
-        return (a.title || a.name || "").localeCompare(b.title || b.name || "");
-      if (sort === "date")
+      if (sort === "title") {
+        return (a.title || a.name || "").localeCompare(
+          b.title || b.name || ""
+        );
+      }
+      if (sort === "date") {
         return (
           new Date(b.release_date || b.first_air_date || 0) -
           new Date(a.release_date || a.first_air_date || 0)
         );
-      if (sort === "rating")
+      }
+      if (sort === "rating") {
         return (b.vote_average || 0) - (a.vote_average || 0);
+      }
       return (b.popularity || 0) - (a.popularity || 0);
     });
 
     return sorted;
   }, [baseList, sort, type, category]);
 
-  // --- Modal open handler ---
+  // Modal open handler
   useEffect(() => {
     const onOpen = (e) => setOpen(e.detail);
     window.addEventListener("detail-open", onOpen);
@@ -198,6 +132,7 @@ export default function MainPage() {
   }, []);
 
   const inList = open ? isInList(open.media_type, open.id) : false;
+
   const toggle = () => {
     if (!open) return;
     if (inList) remove(open.media_type, open.id);
@@ -216,11 +151,12 @@ export default function MainPage() {
   return (
     <div className="main-page">
       <div className="container">
-        {/* --- Hero Section --- */}
+        {/* Hero */}
         <section className="search-hero card page-wrap" style={{ marginTop: "1rem" }}>
           <h1 className="hero-brand">MovieWatchlist 🎬</h1>
           <h2 className="hero-title">Find your next movie or show</h2>
           <p className="hero-sub">Search across movies, series, and more.</p>
+
           <form onSubmit={handleSearchSubmit} className="search-form">
             <input
               className="input"
@@ -228,17 +164,15 @@ export default function MainPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button type="submit" className="btn primary">
-              Search
-            </button>
+            <button type="submit" className="btn primary">Search</button>
           </form>
         </section>
 
-        {/* --- Suggestions --- */}
+        {/* Suggestions */}
         {!showingResults && suggestions.length > 0 && (
           <section className="results page-wrap">
             <h3 className="section-title">Suggestions from your Watchlist</h3>
-            <p className="section-sub">Because you liked items in your list.</p>
+            <p className="section-sub">Because you liked similar titles.</p>
             <div className="media-grid">
               {suggestions.map((item) => (
                 <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
@@ -247,7 +181,7 @@ export default function MainPage() {
           </section>
         )}
 
-        {/* --- Filter Bar & Results --- */}
+        {/* Filter Bar */}
         <section className="results page-wrap">
           <FiltersBar
             sort={sort}
@@ -259,7 +193,6 @@ export default function MainPage() {
             categories={categories}
           />
 
-          {/* "Trending Now" or "Search Results" header BELOW filters */}
           <h3 className="section-title" style={{ marginTop: "12px" }}>
             {showingResults ? "Search Results" : "Trending Now"}
           </h3>
@@ -270,10 +203,7 @@ export default function MainPage() {
                   <SkeletonCard key={i} />
                 ))
               : visible.map((item) => (
-                  <MediaCard
-                    key={`${item.media_type}-${item.id}`}
-                    item={item}
-                  />
+                  <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
                 ))}
           </div>
 
@@ -281,7 +211,6 @@ export default function MainPage() {
             <p className="empty-state">No items to show.</p>
           )}
         </section>
->>>>>>> d5e100757772b7dcaa8e8e67aeb1feaf8d810fad
       </div>
 
       <DetailsModal
