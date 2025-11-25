@@ -184,17 +184,17 @@ export default function MainPage() {
           <div className="media-grid">
             {loading
               ? Array.from({ length: 12 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))
+                <SkeletonCard key={i} />
+              ))
               : (showingResults
-                  ? visible
-                  : visible.slice(0, TRENDING_LIMIT)
-                ).map((item) => (
-                  <MediaCard
-                    key={`${item.media_type}-${item.id}`}
-                    item={item}
-                  />
-                ))}
+                ? visible
+                : visible.slice(0, TRENDING_LIMIT)
+              ).map((item) => (
+                <MediaCard
+                  key={`${item.media_type}-${item.id}`}
+                  item={item}
+                />
+              ))}
           </div>
 
           {!loading && showingResults && visible.length === 0 && (

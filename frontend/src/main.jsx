@@ -33,7 +33,6 @@ function RequireLogin({ children }) {
   if (!auth?.user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-
   return children;
 }
 
