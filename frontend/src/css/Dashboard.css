@@ -1,0 +1,97 @@
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background: #f8fafc;
+color: #111827;
+border-radius: 20px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+.dashboard-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.dashboard-card {
+  background: #ffffff;
+  border: 1px solid #a7f3d0;
+  border-radius: 1.5rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  text-align: center;
+  padding: 2.5rem;
+  width: 90%;
+  max-width: 400px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15);
+}
+
+.dashboard-card h1 {
+  color: #047857;
+  font-size: 1.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.welcome-text {
+  color: #374151;
+  margin-bottom: 1.5rem;
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-picture {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 4px solid #a7f3d0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0.75rem;
+}
+
+.user-email {
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
+.logout-btn {
+  margin-top: 2rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.logout-btn:hover {
+  background-color: #059669;
+  transform: translateY(-1px);
+}
+
+
+/* Redesigned dashboard cards */
+.stats-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; margin: 12px 0 24px; }
+.stat{ padding:16px; border-radius:14px; background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); }
+.stat .label{ color: var(--muted); font-size:.9rem; }
+.stat .value{ font-size:1.6rem; font-weight:800; }
+
+/* Media grid */
+.media-grid{ display:grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
+.media-card img{ border-top-left-radius: 16px; border-top-right-radius: 16px; }
+.media-card .content{ padding:12px 14px; }
+.media-card .title{ font-weight:700; margin: 8px 0 4px; }
+.media-card .meta{ font-size:.9rem; color: var(--muted); }
+.media-card .actions{ display:flex; gap:.5rem; margin-top:10px; }

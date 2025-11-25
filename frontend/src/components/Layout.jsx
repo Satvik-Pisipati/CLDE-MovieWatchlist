@@ -102,6 +102,7 @@ export default function Layout({ children }) {
           >
             Meine Bewertungen
           </NavLink>
+<<<<<<< HEAD
 
           <NavLink
             to="/stats"
@@ -111,6 +112,8 @@ export default function Layout({ children }) {
             Statistik
           </NavLink>
 
+=======
+>>>>>>> 417d2b785d6bb036be53d128afa970f124a95db2
         </div>
 
         {/* Bottom of drawer: ONLY theme toggle */}
