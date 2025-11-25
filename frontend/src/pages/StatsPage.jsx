@@ -108,7 +108,7 @@ export default function StatsPage() {
           className="card page-wrap"
           style={{ marginTop: "1rem", padding: "1.5rem" }}
         >
-          <h1 className="section-title">Meine Seh-Statistik</h1>
+          <h1 className="section-title">Meine Statistik</h1>
 
           {ratings.length === 0 && (
             <p style={{ marginTop: "0.75rem" }}>

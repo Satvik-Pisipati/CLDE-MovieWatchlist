@@ -14,6 +14,8 @@ import MainPage from "./pages/MainPage.jsx";
 import WatchlistPage from "./pages/WatchlistPage.jsx";
 import MyRatingsPage from "./pages/MyRatingsPage.jsx";
 import LoginPage from "./components/Login.jsx";
+import StatsPage from "./pages/StatsPage.jsx";
+
 
 import { AuthProvider, useAuth } from "./state/AuthContext.jsx";
 import { WatchlistProvider } from "./state/WatchlistContext.jsx";
@@ -81,6 +83,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       </RequireLogin>
                     }
                   />
+                  <Route
+                    path="/stats"
+                    element={
+                      <RequireLogin>
+                        <StatsPage />
+                      </RequireLogin>
+                    }
+                  />
+
 
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to="/" replace />} />

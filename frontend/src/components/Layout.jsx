@@ -102,6 +102,15 @@ export default function Layout({ children }) {
           >
             Meine Bewertungen
           </NavLink>
+
+          <NavLink
+            to="/stats"
+            className="drawer-link"
+            onClick={closeDrawer}
+          >
+            Seh-Statistik
+          </NavLink>
+
         </div>
 
         {/* Bottom of drawer: ONLY theme toggle */}
