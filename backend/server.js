@@ -59,36 +59,52 @@ app.post("/auth/google", async (req, res) => {
   }
 });
 
-// Auth check middleware for protected APIs
-// Expects: Authorization: Bearer <Google ID token>
+// Produktive Auth-Middleware:
+// Erwartet einen Google ID Token im Authorization-Header und prüft ihn.
 async function requireAuth(req, res, next) {
   try {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-    if (!token) {
-      return res.status(401).json({ error: "Missing token" });
+    const header = req.headers.authorization || "";
+    const [type, token] = header.split(" ");
+
+    if (type !== "Bearer" || !token) {
+      return res
+        .status(401)
+        .json({ error: "Missing or invalid Authorization header" });
     }
 
-    const user = await verifyGoogleIdToken(token);
-    req.user = user; // attach for later use if needed
+    // Google ID Token verifizieren (nutzt euren bestehenden Helper)
+    const user = await verifyGoogleIdToken(token); // wirft Error bei Ungültigkeit
+
+    // User-Info an die Request hängen (falls später logisch gebraucht)
+    req.user = user;
     next();
   } catch (err) {
-    console.error("Auth failed:", err);
-    return res.status(401).json({ error: "Invalid token" });
+    console.error("Auth error in requireAuth:", err);
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 
-// Protected proxy to TMDB
+// Proxy to TMDB – jetzt wieder MIT Auth
 app.get("/api/tmdb/*", requireAuth, async (req, res) => {
   try {
     const path = req.params[0];
     const query = req.url.includes("?") ? "?" + req.url.split("?")[1] : "";
     const url = `https://api.themoviedb.org/3/${path}${query}`;
 
+    if (!process.env.TMDB_BEARER) {
+      console.error("TMDB_BEARER is NOT set!");
+      return res.status(500).json({ error: "TMDB token not configured" });
+    }
+
+    console.log("Calling TMDB:", url, "for user:", req.user?.email);
+
     const r = await fetch(url, {
-      // Your .env already contains "Bearer <token>"
-      headers: { Authorization: process.env.TMDB_BEARER },
+      headers: {
+        Authorization: `Bearer ${process.env.TMDB_BEARER}`,
+      },
     });
+
+    console.log("TMDB status:", r.status);
 
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);

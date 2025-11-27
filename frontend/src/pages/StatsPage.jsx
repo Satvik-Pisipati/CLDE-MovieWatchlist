@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRatings } from "../state/RatingsContext.jsx";
-import { fetchTMDB } from "../api/tmdb.js";
+import { useAuth } from "../state/AuthContext.jsx";
+import { getDetails } from "../api/tmdb.js";
 
 export default function StatsPage() {
   const { ratings } = useRatings() || { ratings: [] };
+  const { token } = useAuth();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [moviesWithRuntime, setMoviesWithRuntime] = useState([]); // [{id, title, media_type, minutes}]
@@ -12,6 +15,12 @@ export default function StatsPage() {
   // Laufzeiten nachladen, sobald sich die Bewertungen ändern
   useEffect(() => {
     if (!ratings || ratings.length === 0) {
+      setMoviesWithRuntime([]);
+      return;
+    }
+
+    if (!token) {
+      // nicht eingeloggt → keine TMDB-Calls
       setMoviesWithRuntime([]);
       return;
     }
@@ -29,12 +38,8 @@ export default function StatsPage() {
           if (!id) return null;
 
           try {
-            const endpoint =
-              mediaType === "tv"
-                ? `tv/${id}?language=de-DE`
-                : `movie/${id}?language=de-DE`;
-
-            const data = await fetchTMDB(endpoint);
+            // Holt movie/tv-Details über unser Backend-Proxy
+            const data = await getDetails(mediaType, id, "de-DE", token);
 
             let minutes = 0;
 
@@ -87,7 +92,7 @@ export default function StatsPage() {
     return () => {
       cancelled = true;
     };
-  }, [ratings]);
+  }, [ratings, token]);
 
   const totalMinutes = useMemo(
     () => moviesWithRuntime.reduce((sum, m) => sum + (m.minutes || 0), 0),
