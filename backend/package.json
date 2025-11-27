@@ -10,17 +10,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.19.2",
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-    "google-auth-library": "^9.0.0"
-=======
+    
     "google-auth-library": "^9.0.0",
     "jsonwebtoken": "^9.0.2",
     "node-fetch": "^3.3.2"
->>>>>>> Stashed changes
-=======
-    "google-auth-library": "^9.0.0",
-    "node-fetch": "^3.3.2"
->>>>>>> 417d2b785d6bb036be53d128afa970f124a95db2
   }
 }
