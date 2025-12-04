@@ -31,6 +31,7 @@ function loadInitialRatings() {
       if (!raw) continue;
 
       const parsed = JSON.parse(raw);
+      
       if (Array.isArray(parsed)) {
         console.log("[Ratings] loaded from legacy key", key, parsed);
         return parsed;
