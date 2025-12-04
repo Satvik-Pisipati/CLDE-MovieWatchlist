@@ -5,19 +5,47 @@ const LS_KEY = "auth";
 
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch { return null; }
+    try {
+      return JSON.parse(localStorage.getItem(LS_KEY)) || null;
+    } catch {
+      return null;
+    }
   });
 
+  // Save auth state when it changes
   useEffect(() => {
-    if (auth) localStorage.setItem(LS_KEY, JSON.stringify(auth));
-    else localStorage.removeItem(LS_KEY);
+    if (auth) {
+      localStorage.setItem(LS_KEY, JSON.stringify(auth));
+    } else {
+      localStorage.removeItem(LS_KEY);
+    }
   }, [auth]);
 
-  const login = (user, token) => setAuth({ user, token });
-  const logout = () => setAuth(null);
+  // Login stores user + Google ID token
+  const login = (user, token) => {
+    setAuth({ user, token });
+  };
 
-  const value = useMemo(() => ({ ...auth, login, logout }), [auth]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Logout clears everything
+  const logout = () => {
+    setAuth(null);
+  };
+
+  // Provide token and user to entire app
+  const value = useMemo(
+    () => ({
+      user: auth?.user || null,
+      token: auth?.token || null,
+      login,
+      logout,
+      isAuthenticated: !!auth?.token,
+    }),
+    [auth]
+  );
+
+  return (
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

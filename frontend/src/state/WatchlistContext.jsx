@@ -1,50 +1,52 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { apiFetch } from "../api/api"; // wichtig: fetch wrapper mit token
 
 const WatchlistContext = createContext(null);
-const STORAGE_KEY = "moviewatchlist:list";
 
 export function WatchlistProvider({ children }) {
   const [list, setList] = useState([]);
 
-  // Load from localStorage once
+  // Load Watchlist from Backend
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setList(parsed);
+    async function load() {
+      try {
+        const items = await apiFetch("/user/watchlist", { method: "GET" });
+        if (Array.isArray(items)) {
+          setList(items);
+        }
+      } catch (err) {
+        console.error("Failed to load watchlist from backend:", err);
       }
-    } catch (err) {
-      console.error("Failed to load watchlist:", err);
     }
+    load();
   }, []);
 
-  // Save to localStorage on change
-  useEffect(() => {
+  // Add item to backend
+  async function add(item) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      const res = await apiFetch("/user/watchlist", {
+        method: "POST",
+        body: JSON.stringify(item),
+      });
+      if (res?.item) {
+        setList((prev) => [...prev, res.item]);
+      }
     } catch (err) {
-      console.error("Failed to save watchlist:", err);
+      console.error("Failed to add item:", err);
     }
-  }, [list]);
+  }
 
-  const add = (item) => {
-    if (!item || !item.id || !item.media_type) return;
-    setList((prev) => {
-      const exists = prev.some(
-        (it) => it.id === item.id && it.media_type === item.media_type
+  // Remove item from backend
+  async function remove(media_type, id) {
+    try {
+      await apiFetch(`/user/watchlist/${id}`, { method: "DELETE" });
+      setList((prev) =>
+        prev.filter((i) => !(i.id === id && i.media_type === media_type))
       );
-      if (exists) return prev;
-      return [...prev, item];
-    });
-  };
-
-  const remove = (media_type, id) => {
-    setList((prev) =>
-      prev.filter((it) => !(it.id === id && it.media_type === media_type))
-    );
-  };
+    } catch (err) {
+      console.error("Failed to remove item:", err);
+    }
+  }
 
   const isInList = (media_type, id) =>
     list.some((it) => it.id === id && it.media_type === media_type);
