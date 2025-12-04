@@ -1,36 +1,51 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "./AuthContext.jsx";
 
 const WatchlistContext = createContext(null);
-const STORAGE_KEY = "moviewatchlist:list";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 export function WatchlistProvider({ children }) {
   const [list, setList] = useState([]);
+  const auth = useAuth();
 
-  // Load from localStorage once
+  // Beim Login Watchlist vom Backend laden
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setList(parsed);
+    if (!auth?.token) {
+      setList([]);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/watchlist`, {
+          headers: {
+            Authorization: `Bearer ${auth.token}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          console.error("Failed to load watchlist:", await res.text());
+          return;
+        }
+
+        const data = await res.json();
+        setList(Array.isArray(data.items) ? data.items : []);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Load watchlist failed:", err);
       }
-    } catch (err) {
-      console.error("Failed to load watchlist:", err);
-    }
-  }, []);
+    })();
 
-  // Save to localStorage on change
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch (err) {
-      console.error("Failed to save watchlist:", err);
-    }
-  }, [list]);
+    return () => controller.abort();
+  }, [auth?.token]);
 
-  const add = (item) => {
+  const add = async (item) => {
     if (!item || !item.id || !item.media_type) return;
+
+    // Optimistisch im UI hinzufügen
     setList((prev) => {
       const exists = prev.some(
         (it) => it.id === item.id && it.media_type === item.media_type
@@ -38,12 +53,42 @@ export function WatchlistProvider({ children }) {
       if (exists) return prev;
       return [...prev, item];
     });
+
+    if (!auth?.token) return;
+
+    try {
+      await fetch(`${BACKEND_URL}/api/watchlist`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ item }),
+      });
+    } catch (err) {
+      console.error("Failed to save watchlist item:", err);
+      // Optional: bei Fehler wieder entfernen
+    }
   };
 
-  const remove = (media_type, id) => {
+  const remove = async (media_type, id) => {
+    // Sofort im UI entfernen
     setList((prev) =>
       prev.filter((it) => !(it.id === id && it.media_type === media_type))
     );
+
+    if (!auth?.token) return;
+
+    try {
+      await fetch(`${BACKEND_URL}/api/watchlist/${media_type}/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to remove watchlist item:", err);
+    }
   };
 
   const isInList = (media_type, id) =>
