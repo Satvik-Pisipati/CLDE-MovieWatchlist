@@ -5,12 +5,18 @@ import dotenv from "dotenv";
 import fetch from "node-fetch";
 import { OAuth2Client } from "google-auth-library";
 
-dotenv.config();
+// backend/server.js
+import app from "./app.js";
 
-const app = express();
 const PORT = process.env.PORT || 5000;
 
-const ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+app.listen(PORT, () => {
+  console.log(`✅ Backend running on http://localhost:${PORT}`);
+});
+
+
+dotenv.config();
+
 app.use(cors({ origin: ORIGIN, credentials: true }));
 app.use(express.json());
 
