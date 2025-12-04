@@ -18,7 +18,12 @@ dotenv.config();
 const app = express();
 
 const ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
-app.use(cors({ origin: ORIGIN, credentials: true }));
+app.use(
+  cors({
+    origin: ORIGIN,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // ---------- Google Auth Setup ----------
@@ -52,7 +57,7 @@ app.post("/auth/google", async (req, res) => {
 
     const user = await verifyGoogleIdToken(credential);
 
-    // Wir geben das Google-ID-Token zurück, das der Client danach als Bearer-Token verwendet
+    // Wir geben das ursprüngliche Google-Token zurück, der Client nutzt es als Bearer-Token
     return res.json({
       user,
       token: credential,
@@ -88,7 +93,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient);
 const WATCHLIST_TABLE = process.env.WATCHLIST_TABLE || "MovieWatchlist";
 const RATINGS_TABLE = process.env.RATINGS_TABLE || "MovieRatings";
 
-// ---------- TMDB Proxy (optional, aber schon vorhanden) ----------
+// ---------- (Optional) TMDB-Proxy über Backend ----------
 app.get("/api/tmdb/*", requireAuth, async (req, res) => {
   try {
     const path = req.params[0];
@@ -96,6 +101,7 @@ app.get("/api/tmdb/*", requireAuth, async (req, res) => {
     const url = `https://api.themoviedb.org/3/${path}${query}`;
 
     const r = await fetch(url, {
+      // .env: TMDB_BEARER = "Bearer <token>"
       headers: { Authorization: process.env.TMDB_BEARER },
     });
 
@@ -107,7 +113,11 @@ app.get("/api/tmdb/*", requireAuth, async (req, res) => {
   }
 });
 
-// ---------- Watchlist APIs ----------
+// ======================================================
+//                 WATCHLIST ROUTES
+// ======================================================
+
+// GET /api/watchlist -> alle Einträge des Users
 app.get("/api/watchlist", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -126,6 +136,7 @@ app.get("/api/watchlist", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/watchlist  { item: {...tmdbItem} }
 app.post("/api/watchlist", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -142,7 +153,7 @@ app.post("/api/watchlist", requireAuth, async (req, res) => {
       Item: {
         userId,
         sortKey,
-        ...item, // id, media_type, title, poster_path, etc.
+        ...item,
       },
     });
 
@@ -154,6 +165,7 @@ app.post("/api/watchlist", requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/watchlist/:media_type/:id
 app.delete("/api/watchlist/:media_type/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -173,7 +185,11 @@ app.delete("/api/watchlist/:media_type/:id", requireAuth, async (req, res) => {
   }
 });
 
-// ---------- Ratings APIs ----------
+// ======================================================
+//                 RATINGS ROUTES
+// ======================================================
+
+// GET /api/ratings -> alle Bewertungen des Users
 app.get("/api/ratings", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -192,6 +208,7 @@ app.get("/api/ratings", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/ratings  { item: {...tmdbItem}, rating: number }
 app.post("/api/ratings", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -210,7 +227,7 @@ app.post("/api/ratings", requireAuth, async (req, res) => {
         userId,
         sortKey,
         rating: safeRating,
-        ...item, // damit StatsPage alle Infos hat
+        ...item,
       },
     });
 
@@ -222,6 +239,7 @@ app.post("/api/ratings", requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/ratings/:media_type/:id
 app.delete("/api/ratings/:media_type/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;

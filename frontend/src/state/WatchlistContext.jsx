@@ -1,3 +1,4 @@
+// frontend/src/state/WatchlistContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
 
@@ -8,7 +9,7 @@ export function WatchlistProvider({ children }) {
   const [list, setList] = useState([]);
   const auth = useAuth();
 
-  // Beim Login Watchlist vom Backend laden
+  // Watchlist vom Backend laden, sobald wir einen Token haben
   useEffect(() => {
     if (!auth?.token) {
       setList([]);
@@ -17,7 +18,7 @@ export function WatchlistProvider({ children }) {
 
     const controller = new AbortController();
 
-    (async () => {
+    async function loadWatchlist() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/watchlist`, {
           headers: {
@@ -32,12 +33,15 @@ export function WatchlistProvider({ children }) {
         }
 
         const data = await res.json();
-        setList(Array.isArray(data.items) ? data.items : []);
+        const items = Array.isArray(data.items) ? data.items : [];
+        setList(items);
       } catch (err) {
         if (err.name === "AbortError") return;
         console.error("Load watchlist failed:", err);
       }
-    })();
+    }
+
+    loadWatchlist();
 
     return () => controller.abort();
   }, [auth?.token]);
@@ -54,7 +58,10 @@ export function WatchlistProvider({ children }) {
       return [...prev, item];
     });
 
-    if (!auth?.token) return;
+    if (!auth?.token) {
+      console.warn("Not authenticated, cannot persist watchlist item");
+      return;
+    }
 
     try {
       await fetch(`${BACKEND_URL}/api/watchlist`, {
@@ -77,7 +84,10 @@ export function WatchlistProvider({ children }) {
       prev.filter((it) => !(it.id === id && it.media_type === media_type))
     );
 
-    if (!auth?.token) return;
+    if (!auth?.token) {
+      console.warn("Not authenticated, cannot remove from backend");
+      return;
+    }
 
     try {
       await fetch(`${BACKEND_URL}/api/watchlist/${media_type}/${id}`, {

@@ -1,3 +1,4 @@
+// frontend/src/state/RatingsContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
 
@@ -8,7 +9,7 @@ export function RatingsProvider({ children }) {
   const [ratings, setRatings] = useState([]); // [{ id, media_type, rating, ...item }]
   const auth = useAuth();
 
-  // Beim Login Ratings vom Backend laden
+  // Ratings vom Backend laden, sobald wir einen Token haben
   useEffect(() => {
     if (!auth?.token) {
       setRatings([]);
@@ -17,7 +18,7 @@ export function RatingsProvider({ children }) {
 
     const controller = new AbortController();
 
-    (async () => {
+    async function loadRatings() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/ratings`, {
           headers: {
@@ -32,19 +33,22 @@ export function RatingsProvider({ children }) {
         }
 
         const data = await res.json();
-        setRatings(Array.isArray(data.items) ? data.items : []);
+        const items = Array.isArray(data.items) ? data.items : [];
+        setRatings(items);
       } catch (err) {
         if (err.name === "AbortError") return;
         console.error("Load ratings failed:", err);
       }
-    })();
+    }
+
+    loadRatings();
 
     return () => controller.abort();
   }, [auth?.token]);
 
   const rate = async (item, rating) => {
     if (!item || !item.id || !item.media_type) return;
-    const safeRating = Math.max(0, Math.min(10, rating));
+    const safeRating = Math.max(0, Math.min(10, Number(rating) || 0));
 
     // Optimistisch im UI anpassen
     setRatings((prev) => {
@@ -63,7 +67,10 @@ export function RatingsProvider({ children }) {
       return copy;
     });
 
-    if (!auth?.token) return;
+    if (!auth?.token) {
+      console.warn("Not authenticated, cannot persist rating");
+      return;
+    }
 
     try {
       await fetch(`${BACKEND_URL}/api/ratings`, {
@@ -85,7 +92,10 @@ export function RatingsProvider({ children }) {
       prev.filter((r) => !(r.id === id && r.media_type === media_type))
     );
 
-    if (!auth?.token) return;
+    if (!auth?.token) {
+      console.warn("Not authenticated, cannot delete rating in backend");
+      return;
+    }
 
     try {
       await fetch(`${BACKEND_URL}/api/ratings/${media_type}/${id}`, {
