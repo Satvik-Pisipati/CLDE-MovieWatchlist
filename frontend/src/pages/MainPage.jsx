@@ -1,4 +1,3 @@
-import { useAuth } from "../state/AuthContext.jsx";
 import { useEffect, useMemo, useState } from "react";
 import MediaCard from "../components/MediaCard.jsx";
 import SkeletonCard from "../components/SkeletonCard.jsx";
@@ -11,11 +10,17 @@ import {
   recommendationsFromWatchlist,
   getGenres,
 } from "../api/tmdb.js";
+import { useAuth } from "../state/AuthContext.jsx";
 import { useWatchlist } from "../state/WatchlistContext.jsx";
 import { useRatings } from "../state/RatingsContext.jsx";
 
+
 export default function MainPage() {
-  const { user, token } = useAuth(); // token kommt aus AuthContext
+  const { token } = useAuth();
+
+// Sicherheitscheck: solange token null ist, keine API-Aufrufe machen
+if (!token) return null;
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [trending, setTrending] = useState([]);
@@ -35,22 +40,17 @@ export default function MainPage() {
   const TRENDING_LIMIT = 10;
   const SUGGEST_LIMIT = 10;
 
-  // --- Load trending + categories initially (nur wenn token vorhanden) ---
+  // --- Load trending + categories initially ---
+  
   useEffect(() => {
     (async () => {
-      if (!token) {
-        setTrending([]);
-        setCategories([]);
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
       try {
         const [trend, gens] = await Promise.all([
-          trendingTMDB("de-DE", "week", token),
-          getGenres("de-DE", token),
+          trendingTMDB(token),
+          getGenres(token)
         ]);
+
         setTrending(trend);
         setCategories(gens);
       } finally {
@@ -61,19 +61,15 @@ export default function MainPage() {
 
   // --- Generate suggestions based on watchlist + ratings ---
   useEffect(() => {
-    (async () => {
-      if (!token) {
-        setSuggestions([]);
-        return;
-      }
+    if (!token) return;
 
+    (async () => {
       const base = [...(list || []), ...(ratings || [])];
       if (base.length === 0) {
         setSuggestions([]);
         return;
       }
-
-      const recs = await recommendationsFromWatchlist(base, "de-DE", token);
+      const recs = await recommendationsFromWatchlist(base, token);
       setSuggestions(recs);
     })();
   }, [list, ratings, token]);
@@ -81,23 +77,23 @@ export default function MainPage() {
   // --- Live search (debounced) ---
   useEffect(() => {
     const q = query.trim();
-
-    if (!q || !token) {
+    if (!q) {
       setResults([]);
       setLoading(false);
       return;
     }
 
+    if (!token) return;
+
     setLoading(true);
     const timeout = setTimeout(async () => {
       try {
-        const data = await searchTMDB(q, "de-DE", token);
+        const data = await searchTMDB(q, token);
         setResults(data);
       } finally {
         setLoading(false);
       }
     }, 350);
-
     return () => clearTimeout(timeout);
   }, [query, token]);
 
@@ -162,11 +158,6 @@ export default function MainPage() {
     }
   };
 
-  // Optional: Hinweis, wenn kein Login/Token vorhanden
-  // if (!token) {
-  //   return <p className="page-wrap">Bitte zuerst einloggen, um Inhalte zu sehen.</p>;
-  // }
-
   return (
     <div className="main-page">
       <div className="container">
@@ -210,17 +201,17 @@ export default function MainPage() {
           <div className="media-grid">
             {loading
               ? Array.from({ length: 12 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))
+                <SkeletonCard key={i} />
+              ))
               : (showingResults
-                  ? visible
-                  : visible.slice(0, TRENDING_LIMIT)
-                ).map((item) => (
-                  <MediaCard
-                    key={`${item.media_type}-${item.id}`}
-                    item={item}
-                  />
-                ))}
+                ? visible
+                : visible.slice(0, TRENDING_LIMIT)
+              ).map((item) => (
+                <MediaCard
+                  key={`${item.media_type}-${item.id}`}
+                  item={item}
+                />
+              ))}
           </div>
 
           {!loading && showingResults && visible.length === 0 && (

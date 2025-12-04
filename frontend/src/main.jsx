@@ -13,9 +13,8 @@ import Layout from "./components/Layout.jsx";
 import MainPage from "./pages/MainPage.jsx";
 import WatchlistPage from "./pages/WatchlistPage.jsx";
 import MyRatingsPage from "./pages/MyRatingsPage.jsx";
-import LoginPage from "./components/Login.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
-
+import LoginPage from "./components/Login.jsx";
 
 import { AuthProvider, useAuth } from "./state/AuthContext.jsx";
 import { WatchlistProvider } from "./state/WatchlistContext.jsx";
@@ -25,7 +24,7 @@ import "./css/theme.css";
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-// Guard: only render children if logged in, otherwise go to /login
+// Guard: nur angemeldet → Kinder rendern, sonst /login
 function RequireLogin({ children }) {
   const auth = useAuth();
   const location = useLocation();
@@ -36,7 +35,7 @@ function RequireLogin({ children }) {
   return children;
 }
 
-// Root redirect: / -> /home if signed in, else /login
+// Root redirect: / → /home oder /login
 function RootRedirect() {
   const auth = useAuth();
   return <Navigate to={auth?.user ? "/home" : "/login"} replace />;
@@ -51,7 +50,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <BrowserRouter>
               <Layout>
                 <Routes>
-                  {/* Root redirect */}
                   <Route path="/" element={<RootRedirect />} />
 
                   {/* Public */}
@@ -90,7 +88,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       </RequireLogin>
                     }
                   />
-
 
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to="/" replace />} />

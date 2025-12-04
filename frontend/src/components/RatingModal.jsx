@@ -7,7 +7,6 @@ export default function RatingModal() {
   const [value, setValue] = useState(0);
   const [hover, setHover] = useState(0);
 
-  // Listen globally for "rating-open"
   useEffect(() => {
     const onOpen = (e) => {
       const item = e.detail;
@@ -51,7 +50,7 @@ export default function RatingModal() {
           fontSize: "32px",
           color: filled ? "#facc15" : "#4b5563",
           transition: "color 0.1s",
-          marginRight: 4
+          marginRight: 4,
         }}
       >
         ★
@@ -84,7 +83,9 @@ export default function RatingModal() {
           </div>
 
           <div>
-            <p className="overview">Wie sehr hat dir dieser Titel gefallen?</p>
+            <p className="overview">
+              Wie sehr hat dir dieser Titel gefallen?
+            </p>
 
             <div style={{ display: "flex", marginBottom: 16 }}>
               {[1, 2, 3, 4, 5].map((i) => (
@@ -100,7 +101,11 @@ export default function RatingModal() {
             </p>
 
             <div className="actions-row" style={{ marginTop: 16 }}>
-              <button className="btn primary" onClick={save} disabled={value === 0}>
+              <button
+                className="btn primary"
+                onClick={save}
+                disabled={value === 0}
+              >
                 Speichern
               </button>
               <button className="btn ghost" onClick={clear}>

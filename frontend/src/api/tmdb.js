@@ -1,18 +1,10 @@
 // src/api/tmdb.js
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
 
-/**
- * Low-level Fetch gegen unser Backend-Proxy:
- *   GET /api/tmdb/<endpoint>
- *   z.B. endpoint = "search/multi?query=..."
- *
- * Erwartet einen gültigen Google-ID-Token im Header.
- */
-async function fetchTMDB(endpoint, token) {
-  if (!token) {
-    throw new Error("Missing auth token for TMDB request");
-  }
+// Proxy-Fetch über Backend (mit Google-ID-Token)
+export async function fetchTMDB(endpoint, token) {
+  if (!token) throw new Error("Missing auth token for TMDB request");
 
   const url = `${BACKEND}/api/tmdb/${endpoint}`;
 
@@ -23,17 +15,14 @@ async function fetchTMDB(endpoint, token) {
   });
 
   if (!res.ok) {
-    console.error(`TMDB proxy fetch failed: ${url}`, res.status);
-    throw new Error(`TMDB proxy error: ${res.status}`);
+    throw new Error("TMDB Proxy failed: " + res.status);
   }
 
   return await res.json();
 }
 
-/* -------------------------------------------------------
-   Search across movies & TV
-------------------------------------------------------- */
-export async function searchTMDB(query, language = "de-DE", token) {
+// SEARCH
+export async function searchTMDB(query, token, language = "de-DE") {
   if (!query) return [];
   const data = await fetchTMDB(
     `search/multi?query=${encodeURIComponent(query)}&language=${language}`,
@@ -41,44 +30,33 @@ export async function searchTMDB(query, language = "de-DE", token) {
   );
   return (
     data.results?.filter(
-      (item) => item.media_type === "movie" || item.media_type === "tv"
+      (i) => i.media_type === "movie" || i.media_type === "tv"
     ) || []
   );
 }
 
-/* -------------------------------------------------------
-   Get trending movies/TV
-------------------------------------------------------- */
-export async function trendingTMDB(language = "de-DE", timeWindow = "week", token) {
+// TRENDING
+export async function trendingTMDB(token, language = "de-DE") {
   const data = await fetchTMDB(
-    `trending/all/${timeWindow}?language=${language}`,
+    `trending/all/week?language=${language}`,
     token
   );
   return data.results || [];
 }
 
-/* -------------------------------------------------------
-   Get detailed info for a movie or TV show
-------------------------------------------------------- */
-export async function getDetails(media_type, id, language = "de-DE", token) {
+// DETAILS
+export async function getDetails(media_type, id, token, language = "de-DE") {
   if (!media_type || !id) return null;
-  const data = await fetchTMDB(
-    `${media_type}/${id}?language=${language}`,
-    token
-  );
-  return data;
+  return await fetchTMDB(`${media_type}/${id}?language=${language}`, token);
 }
 
-/* -------------------------------------------------------
-   Get recommendations for a given media item
-------------------------------------------------------- */
+// RECOMMENDATIONS
 export async function getRecommendations(
   media_type,
   id,
-  language = "de-DE",
-  token
+  token,
+  language = "de-DE"
 ) {
-  if (!media_type || !id) return [];
   const data = await fetchTMDB(
     `${media_type}/${id}/recommendations?language=${language}`,
     token
@@ -86,14 +64,8 @@ export async function getRecommendations(
   return data.results || [];
 }
 
-/* -------------------------------------------------------
-   Build recommendations from user watchlist
-------------------------------------------------------- */
-export async function recommendationsFromWatchlist(
-  list,
-  language = "de-DE",
-  token
-) {
+// BUILD RECOMMENDATIONS FROM WATCHLIST
+export async function recommendationsFromWatchlist(list, token) {
   if (!Array.isArray(list) || list.length === 0) return [];
 
   const all = [];
@@ -102,7 +74,6 @@ export async function recommendationsFromWatchlist(
       const recs = await getRecommendations(
         item.media_type,
         item.id,
-        language,
         token
       );
       all.push(...recs);
@@ -123,25 +94,18 @@ export async function recommendationsFromWatchlist(
   return unique;
 }
 
-/* -------------------------------------------------------
-   NEW: Get merged list of genres (Movies + TV)
-------------------------------------------------------- */
-export async function getGenres(language = "de-DE", token) {
-  const [movieGenres, tvGenres] = await Promise.all([
+// GENRES
+export async function getGenres(token, language = "de-DE") {
+  const [movie, tv] = await Promise.all([
     fetchTMDB(`genre/movie/list?language=${language}`, token),
     fetchTMDB(`genre/tv/list?language=${language}`, token),
   ]);
-
-  const byId = new Map();
-  (movieGenres.genres || []).forEach((g) => byId.set(g.id, g));
-  (tvGenres.genres || []).forEach((g) => byId.set(g.id, g));
-
-  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const map = new Map();
+  movie.genres?.forEach((g) => map.set(g.id, g));
+  tv.genres?.forEach((g) => map.set(g.id, g));
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/* -------------------------------------------------------
-   Utility: Build full TMDB poster URL
-------------------------------------------------------- */
 export function posterUrl(path, size = "w500") {
   if (!path) return "https://via.placeholder.com/500x750?text=No+Image";
   return `https://image.tmdb.org/t/p/${size}${path}`;

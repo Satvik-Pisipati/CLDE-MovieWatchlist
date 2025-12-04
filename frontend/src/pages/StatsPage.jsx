@@ -1,8 +1,9 @@
+// src/pages/StatsPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRatings } from "../state/RatingsContext.jsx";
+import { fetchTMDB } from "../api/tmdb.js";
 import { useAuth } from "../state/AuthContext.jsx";
-import { getDetails } from "../api/tmdb.js";
 
 export default function StatsPage() {
   const { ratings } = useRatings() || { ratings: [] };
@@ -14,13 +15,7 @@ export default function StatsPage() {
 
   // Laufzeiten nachladen, sobald sich die Bewertungen ändern
   useEffect(() => {
-    if (!ratings || ratings.length === 0) {
-      setMoviesWithRuntime([]);
-      return;
-    }
-
-    if (!token) {
-      // nicht eingeloggt → keine TMDB-Calls
+    if (!ratings || ratings.length === 0 || !token) {
       setMoviesWithRuntime([]);
       return;
     }
@@ -38,31 +33,41 @@ export default function StatsPage() {
           if (!id) return null;
 
           try {
-            // Holt movie/tv-Details über unser Backend-Proxy
-            const data = await getDetails(mediaType, id, "de-DE", token);
+            const endpoint =
+              mediaType === "tv"
+                ? `tv/${id}?language=de-DE`
+                : `movie/${id}?language=de-DE`;
+
+            // Wichtig: über Backend-Proxy mit Token
+            const data = await fetchTMDB(endpoint, token);
 
             let minutes = 0;
 
             if (mediaType === "movie") {
+              // Filme: direkte Laufzeit in Minuten
               minutes = data.runtime || 0;
             } else if (mediaType === "tv") {
-              // Vereinfachte Annahme: Episodendauer * Anzahl Episoden
+              // Serien: Episodendauer * Anzahl Episoden (mit Fallbacks)
               let perEpisode = 0;
-              // 1) Falls episode_run_time vorhanden ist (TMDb liefert manchmal ein Array)
-              if (Array.isArray(data.episode_run_time) && data.episode_run_time.length > 0) {
+
+              // 1) Falls episode_run_time als Array gesetzt ist
+              if (
+                Array.isArray(data.episode_run_time) &&
+                data.episode_run_time.length > 0
+              ) {
                 perEpisode = data.episode_run_time[0];
               }
 
-              // 2) Falls das leer war → letzte Episode prüfen
+              // 2) Fallback: runtime der zuletzt ausgestrahlten Episode
               if (!perEpisode && data.last_episode_to_air?.runtime) {
                 perEpisode = data.last_episode_to_air.runtime;
               }
 
-              // 3) Minuten berechnen, wenn möglich
+              // 3) Wenn wir Episodendauer UND Anzahl Episoden haben:
               if (perEpisode && data.number_of_episodes) {
                 minutes = perEpisode * data.number_of_episodes;
               } else {
-                minutes = 0; // Fallback
+                minutes = 0; // keine verwertbaren Laufzeitdaten
               }
             }
 
@@ -105,6 +110,7 @@ export default function StatsPage() {
     };
   }, [ratings, token]);
 
+  // Gesamtlaufzeit in Minuten
   const totalMinutes = useMemo(
     () => moviesWithRuntime.reduce((sum, m) => sum + (m.minutes || 0), 0),
     [moviesWithRuntime]
@@ -125,14 +131,14 @@ export default function StatsPage() {
         >
           <h1 className="section-title">Meine Statistik</h1>
 
-          {ratings.length === 0 && (
+          {(!ratings || ratings.length === 0) && (
             <p style={{ marginTop: "0.75rem" }}>
               Du hast noch keine Filme/Serien bewertet.{" "}
               <Link to="/home">Jetzt Titel entdecken</Link>
             </p>
           )}
 
-          {ratings.length > 0 && (
+          {ratings && ratings.length > 0 && (
             <>
               <p style={{ marginTop: "0.75rem" }}>
                 Basierend auf deinen Bewertungen hast du ungefähr:
@@ -254,7 +260,7 @@ export default function StatsPage() {
               }}
             >
               Hinweis: Für Serien wird die gesamte Laufzeit aus Anzahl Episoden ×
-              durchschnittlicher Episodendauer geschätzt (TMDB-Daten).
+              durchschnittlicher Episodendauer geschätzt (TMDb-Daten).
             </p>
           </section>
         )}
