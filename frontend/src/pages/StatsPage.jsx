@@ -47,11 +47,22 @@ export default function StatsPage() {
               minutes = data.runtime || 0;
             } else if (mediaType === "tv") {
               // Vereinfachte Annahme: Episodendauer * Anzahl Episoden
-              const perEpisode = Array.isArray(data.episode_run_time)
-                ? data.episode_run_time[0]
-                : data.episode_run_time;
+              let perEpisode = 0;
+              // 1) Falls episode_run_time vorhanden ist (TMDb liefert manchmal ein Array)
+              if (Array.isArray(data.episode_run_time) && data.episode_run_time.length > 0) {
+                perEpisode = data.episode_run_time[0];
+              }
+
+              // 2) Falls das leer war → letzte Episode prüfen
+              if (!perEpisode && data.last_episode_to_air?.runtime) {
+                perEpisode = data.last_episode_to_air.runtime;
+              }
+
+              // 3) Minuten berechnen, wenn möglich
               if (perEpisode && data.number_of_episodes) {
                 minutes = perEpisode * data.number_of_episodes;
+              } else {
+                minutes = 0; // Fallback
               }
             }
 
