@@ -1,0 +1,445 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "MovieWatchlist Backend (Watchlist) - Lambda + API Gateway + DynamoDB"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: MovieWatchlist
+  ApiStageName:
+    Type: String
+    Default: prod
+  GoogleClientId:
+    Type: String
+    Description: "Google OAuth Client ID for token verification"
+
+Resources:
+  WatchlistTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-Watchlist"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: movieKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: movieKey
+          KeyType: RANGE
+
+  WatchlistLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-WatchlistHandler"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      Timeout: 10
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref WatchlistTable
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+      Code:
+        ZipFile: |
+          const AWS = require("aws-sdk");
+          const dynamo = new AWS.DynamoDB.DocumentClient();
+          const corsHeaders = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          };
+
+          async function verifyGoogleIdToken(idToken, googleClientId) {
+            if (!idToken) {
+              throw new Error("Missing token");
+            }
+            const res = await fetch(
+              "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken)
+            );
+            if (!res.ok) {
+              throw new Error("Invalid Google token");
+            }
+            const data = await res.json();
+            if (data.aud !== googleClientId) {
+              throw new Error("Token audience mismatch");
+            }
+            if (!data.sub || !data.email) {
+              throw new Error("Invalid token payload");
+            }
+            return {
+              id: data.sub,
+              email: data.email,
+              name: data.name,
+              picture: data.picture,
+            };
+          }
+
+          exports.handler = async (event) => {
+            try {
+              if (event.httpMethod === "OPTIONS") {
+                return {
+                  statusCode: 200,
+                  headers: corsHeaders,
+                  body: "",
+                };
+              }
+
+              const authHeader = event.headers?.Authorization || event.headers?.authorization || "";
+              const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+              const googleClientId = process.env.GOOGLE_CLIENT_ID;
+              const user = await verifyGoogleIdToken(token, googleClientId);
+              const userId = user.id;
+
+              const tableName = process.env.TABLE_NAME;
+              const path = event.resource || event.path;
+              const method = event.httpMethod;
+
+              if (path === "/watchlist" && method === "GET") {
+                const data = await dynamo
+                  .query({
+                    TableName: tableName,
+                    KeyConditionExpression: "userId = :u",
+                    ExpressionAttributeValues: { ":u": userId },
+                  })
+                  .promise();
+                return {
+                  statusCode: 200,
+                  headers: corsHeaders,
+                  body: JSON.stringify(data.Items || []),
+                };
+              }
+
+              if (path === "/watchlist" && method === "POST") {
+                const body = JSON.parse(event.body || "{}");
+                if (!body.id || !body.media_type) {
+                  return {
+                    statusCode: 400,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ error: "Invalid payload" }),
+                  };
+                }
+                const movieKey = `${body.media_type}#${body.id}`;
+                await dynamo
+                  .put({
+                    TableName: tableName,
+                    Item: {
+                      userId,
+                      movieKey,
+                      ...body,
+                      addedAt: new Date().toISOString(),
+                    },
+                  })
+                  .promise();
+                return {
+                  statusCode: 200,
+                  headers: corsHeaders,
+                  body: JSON.stringify({ success: true }),
+                };
+              }
+
+              if (path === "/watchlist/{mediaType}/{id}" && method === "DELETE") {
+                const mediaType = event.pathParameters?.mediaType;
+                const id = event.pathParameters?.id;
+                const movieKey = `${mediaType}#${id}`;
+                await dynamo
+                  .delete({
+                    TableName: tableName,
+                    Key: { userId, movieKey },
+                  })
+                  .promise();
+                return {
+                  statusCode: 200,
+                  headers: corsHeaders,
+                  body: JSON.stringify({ success: true }),
+                };
+              }
+
+              return {
+                statusCode: 404,
+                headers: corsHeaders,
+                body: JSON.stringify({ error: "Not found" }),
+              };
+            } catch (err) {
+              console.error("Lambda error:", err);
+              return {
+                statusCode: 500,
+                headers: corsHeaders,
+                body: JSON.stringify({ error: "Internal Server Error", details: err.message }),
+              };
+            }
+          };
+
+  AuthLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-AuthHandler"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      Timeout: 10
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+      Code:
+        ZipFile: |
+          const corsHeaders = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          };
+
+          exports.handler = async (event) => {
+            try {
+              if (event.httpMethod === "OPTIONS") {
+                return { statusCode: 200, headers: corsHeaders, body: "" };
+              }
+
+              const body = JSON.parse(event.body || "{}");
+              const credential = body.credential;
+              if (!credential) {
+                return {
+                  statusCode: 400,
+                  headers: corsHeaders,
+                  body: JSON.stringify({ error: "Missing credential" }),
+                };
+              }
+
+              const res = await fetch(
+                "https://oauth2.googleapis.com/tokeninfo?id_token=" +
+                  encodeURIComponent(credential)
+              );
+
+              if (!res.ok) {
+                return {
+                  statusCode: 401,
+                  headers: corsHeaders,
+                  body: JSON.stringify({ error: "Invalid Google token" }),
+                };
+              }
+
+              const data = await res.json();
+
+              if (data.aud !== process.env.GOOGLE_CLIENT_ID) {
+                return {
+                  statusCode: 401,
+                  headers: corsHeaders,
+                  body: JSON.stringify({ error: "Token audience mismatch" }),
+                };
+              }
+
+              if (!data.sub || !data.email) {
+                return {
+                  statusCode: 401,
+                  headers: corsHeaders,
+                  body: JSON.stringify({ error: "Invalid token payload" }),
+                };
+              }
+
+              const user = {
+                id: data.sub,
+                email: data.email,
+                name: data.name,
+                picture: data.picture,
+              };
+
+              return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({
+                  user,
+                  token: credential,
+                }),
+              };
+            } catch (err) {
+              console.error("Auth lambda error", err);
+              return {
+                statusCode: 500,
+                headers: corsHeaders,
+                body: JSON.stringify({ error: "Internal Server Error" }),
+              };
+            }
+          };
+
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${ProjectName}-API"
+
+  ApiResourceWatchlist:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: "watchlist"
+
+  ApiResourceWatchlistItem:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref ApiResourceWatchlist
+      PathPart: "{mediaType}"
+  ApiResourceWatchlistItemId:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref ApiResourceWatchlistItem
+      PathPart: "{id}"
+
+  ApiResourceAuth:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: "auth"
+
+  ApiResourceAuthGoogle:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref ApiResourceAuth
+      PathPart: "google"
+
+  GetWatchlistMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResourceWatchlist
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WatchlistLambda.Arn}/invocations"
+
+  PostWatchlistMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResourceWatchlist
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WatchlistLambda.Arn}/invocations"
+
+  DeleteWatchlistItemMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResourceWatchlistItemId
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WatchlistLambda.Arn}/invocations"
+
+  OptionsWatchlistMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResourceWatchlist
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,DELETE,OPTIONS'"
+            ResponseTemplates:
+              application/json: "{}"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  PostAuthGoogleMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResourceAuthGoogle
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations"
+
+  OptionsAuthGoogleMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResourceAuthGoogle
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            ResponseTemplates:
+              application/json: "{}"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref ApiGateway
+    DependsOn:
+      - GetWatchlistMethod
+      - PostWatchlistMethod
+      - DeleteWatchlistItemMethod
+      - OptionsWatchlistMethod
+      - PostAuthGoogleMethod
+      - OptionsAuthGoogleMethod
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: !Ref ApiStageName
+      RestApiId: !Ref ApiGateway
+      DeploymentId: !Ref ApiDeployment
+
+  LambdaPermissionForApi:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WatchlistLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/*"
+
+  LambdaPermissionForAuthApi:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/*"
+
+Outputs:
+  ApiBaseUrl:
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}"
+  WatchlistTableName:
+    Value: !Ref WatchlistTable

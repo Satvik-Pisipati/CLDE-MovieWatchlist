@@ -47,8 +47,7 @@ app.post("/auth/google", async (req, res) => {
 
     const user = await verifyGoogleIdToken(credential);
 
-    // We DON'T create our own JWT anymore.
-    // Just return the Google ID token so the frontend can send it back as Bearer.
+    // Wir verwenden direkt das Google-ID-Token als Bearer-Token.
     return res.json({
       user,
       token: credential,
@@ -86,7 +85,6 @@ app.get("/api/tmdb/*", requireAuth, async (req, res) => {
     const url = `https://api.themoviedb.org/3/${path}${query}`;
 
     const r = await fetch(url, {
-      // Your .env already contains "Bearer <token>"
       headers: { Authorization: process.env.TMDB_BEARER },
     });
 
