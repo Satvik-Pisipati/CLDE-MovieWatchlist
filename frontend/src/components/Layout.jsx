@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "../state/AuthContext.jsx";
 
 function getInitialTheme() {
   if (typeof window === "undefined") return "dark";
@@ -10,9 +11,10 @@ function getInitialTheme() {
     : "light";
 }
 
-export default function Layout({ children }) {
+export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [theme, setTheme] = useState(getInitialTheme);
+  const { currentUser, isAuthenticated, logout } = useAuth();
 
   const closeDrawer = () => setDrawerOpen(false);
 
@@ -44,7 +46,45 @@ export default function Layout({ children }) {
             MovieWatchlist 🎬
           </strong>
 
-          <div style={{ marginLeft: "auto" }} />
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+            }}
+          >
+            {isAuthenticated && currentUser && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                {currentUser.picture && (
+                  <img
+                    src={currentUser.picture}
+                    alt={currentUser.name || currentUser.email}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                    }}
+                  />
+                )}
+                <span style={{ fontSize: "0.9rem" }}>
+                  {currentUser.name || currentUser.email}
+                </span>
+              </div>
+            )}
+            {isAuthenticated && (
+              <button className="btn ghost" onClick={logout}>
+                Logout
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -113,7 +153,9 @@ export default function Layout({ children }) {
         <div className="drawer-backdrop" onClick={closeDrawer} />
       )}
 
-      <main style={{ paddingTop: "64px" }}>{children}</main>
+      <main style={{ paddingTop: "64px" }}>
+        <Outlet />
+      </main>
     </div>
   );
 }
