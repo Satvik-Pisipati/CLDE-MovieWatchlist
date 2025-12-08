@@ -1,0 +1,11 @@
+{
+    "name": "moviewatchlist-backend",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+      "@aws-sdk/client-dynamodb": "^3.590.0",
+      "@aws-sdk/lib-dynamodb": "^3.590.0",
+      "node-fetch": "^3.3.2"
+    }
+  }
+  

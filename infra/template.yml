@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Movie Watchlist - DynamoDB + Cognito (Learner Lab Compatible)
+
+Parameters:
+  TableName:
+    Type: String
+    Default: MovieWatchlist
+    Description: DynamoDB table for storing user watchlist items
+
+  CognitoDomainPrefix:
+    Type: String
+    Default: movie-watchlist-auth
+    Description: Must be globally unique in the AWS region
+
+  DevCallbackUrl:
+    Type: String
+    Default: http://localhost:5173/
+    Description: Callback URL for local development (allowed without HTTPS)
+
+Resources:
+
+  ##########################################
+  # DynamoDB Table
+  ##########################################
+  WatchlistTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: movieId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: movieId
+          KeyType: RANGE
+
+  ##########################################
+  # Cognito User Pool
+  ##########################################
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: movie-watchlist-user-pool
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+          AttributeDataType: String
+
+  ##########################################
+  # Cognito SPA App Client
+  ##########################################
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: movie-watchlist-spa
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - implicit
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - !Ref DevCallbackUrl
+      LogoutURLs:
+        - !Ref DevCallbackUrl
+      PreventUserExistenceErrors: ENABLED
+
+  ##########################################
+  # Cognito Hosted UI Domain
+  ##########################################
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref CognitoUserPool
+
+Outputs:
+
+  DynamoTableName:
+    Description: DynamoDB Table Name
+    Value: !Ref WatchlistTable
+
+  DynamoTableArn:
+    Description: DynamoDB Table ARN
+    Value: !GetAtt WatchlistTable.Arn
+
+  CognitoPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+
+  CognitoClientId:
+    Description: Cognito SPA Client ID
+    Value: !Ref CognitoUserPoolClient
+
+  CognitoDomainUrl:
+    Description: Hosted UI Login URL
+    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+
+  Region:
+    Description: Deployment region
+    Value: !Ref AWS::Region

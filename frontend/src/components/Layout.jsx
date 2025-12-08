@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { useAuth } from "../state/AuthContext.jsx";
 
 function getInitialTheme() {
   if (typeof window === "undefined") return "dark";
@@ -12,7 +11,6 @@ function getInitialTheme() {
 }
 
 export default function Layout({ children }) {
-  const { user, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [theme, setTheme] = useState(getInitialTheme);
 
@@ -46,26 +44,7 @@ export default function Layout({ children }) {
             MovieWatchlist 🎬
           </strong>
 
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-            {user && (
-              <>
-                {user.picture && (
-                  <img
-                    src={user.picture}
-                    alt={user.name || "User"}
-                    width={28}
-                    height={28}
-                    style={{ borderRadius: "50%" }}
-                  />
-                )}
-                <span style={{ fontSize: ".9rem" }}>{user.name}</span>
-                {/* keep a small logout in the top bar */}
-                <button className="btn ghost" onClick={logout}>
-                  Logout
-                </button>
-              </>
-            )}
-          </div>
+          <div style={{ marginLeft: "auto" }} />
         </div>
       </header>
 

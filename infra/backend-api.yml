@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Movie Watchlist backend using SAM (no IAM permissions required)
+
+Parameters:
+  TableName:
+    Type: String
+  TableArn:
+    Type: String
+  CognitoUserPoolId:
+    Type: String
+  CognitoUserPoolClientId:
+    Type: String
+  LambdaCodeBucket:
+    Type: String
+  LambdaCodeKey:
+    Type: String
+  AllowedOrigin:
+    Type: String
+    Default: http://localhost:5173
+  StageName:
+    Type: String
+    Default: prod
+
+Resources:
+
+  BackendLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: moviewatchlist-backend
+      Runtime: nodejs20.x
+      Handler: index.handler
+      CodeUri:
+        Bucket: !Ref LambdaCodeBucket
+        Key: !Ref LambdaCodeKey
+      Timeout: 20
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+          TMDB_KEY: "REPLACE_ME"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+      Events:
+        GetWatchlist:
+          Type: HttpApi
+          Properties:
+            Path: /watchlist
+            Method: GET
+            ApiId: !Ref HttpApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PostWatchlist:
+          Type: HttpApi
+          Properties:
+            Path: /watchlist
+            Method: POST
+            ApiId: !Ref HttpApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+        DeleteWatchlist:
+          Type: HttpApi
+          Properties:
+            Path: /watchlist/{itemId}
+            Method: DELETE
+            ApiId: !Ref HttpApi
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}"
+              audience:
+                - !Ref CognitoUserPoolClientId
+            IdentitySource: "$request.header.Authorization"
+
+Outputs:
+  HttpApiUrl:
+    Description: Base URL for the HTTP API
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
