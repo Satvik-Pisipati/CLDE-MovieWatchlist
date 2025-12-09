@@ -1,70 +1,101 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-const RatingsContext = createContext(null);
-const STORAGE_KEY = "moviewatchlist:ratings";
+// API Helper — same as WatchlistContext
+async function api(method, url, body) {
+  const token = localStorage.getItem("googleToken");
+  if (!token) throw new Error("Missing Google token");
+
+  const res = await fetch(import.meta.env.VITE_API_URL + url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-google-id-token": token
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "API error");
+  return json;
+}
+
+const RatingsContext = createContext();
+export const useRatings = () => useContext(RatingsContext);
 
 export function RatingsProvider({ children }) {
-  const [ratings, setRatings] = useState([]); // [{ id, media_type, rating, ...item }]
+  const [ratings, setRatings] = useState([]);
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  // ----------------------------------------------------------
+  // Load ratings from backend
+  // ----------------------------------------------------------
+  async function refresh() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setRatings(parsed);
+      const data = await api("GET", "/ratings");
+      setRatings(data.items || []);
     } catch (err) {
-      console.error("Failed to load ratings:", err);
+      console.error("Ratings refresh failed:", err);
     }
+    setLoaded(true);
+  }
+
+  // ----------------------------------------------------------
+  // Rate or update rating
+  // ----------------------------------------------------------
+  async function rate(item, ratingValue) {
+    const itemId = `${item.media_type}-${item.id}`;
+
+    try {
+      await api("POST", "/ratings", {
+        itemId,
+        rating: Number(ratingValue),
+        media_type: item.media_type
+      });
+      await refresh();
+    } catch (err) {
+      console.error("Rating failed:", err);
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Delete rating (un-rate)
+  // ----------------------------------------------------------
+  async function unrate(media_type, id) {
+    const itemId = `${media_type}-${id}`;
+
+    try {
+      await api("DELETE", `/ratings/${itemId}`);
+      await refresh();
+    } catch (err) {
+      console.error("Unrate failed:", err);
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Get rating for a single movie/show
+  // ----------------------------------------------------------
+  function getRating(media_type, id) {
+    const itemId = `${media_type}-${id}`;
+    return ratings.find((r) => r.itemId === itemId)?.rating || null;
+  }
+
+  // Load on first mount
+  useEffect(() => {
+    refresh();
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
-    } catch (err) {
-      console.error("Failed to save ratings:", err);
-    }
-  }, [ratings]);
-
-  const rate = (item, rating) => {
-    if (!item || !item.id || !item.media_type) return;
-    const safeRating = Math.max(0, Math.min(10, rating));
-    setRatings((prev) => {
-      const idx = prev.findIndex(
-        (r) => r.id === item.id && r.media_type === item.media_type
-      );
-      const withMeta = {
-        ...item,
-        media_type: item.media_type,
-        title: item.title || item.name,
-        rating: safeRating,
-      };
-      if (idx === -1) return [...prev, withMeta];
-      const copy = [...prev];
-      copy[idx] = withMeta;
-      return copy;
-    });
-  };
-
-  const unrate = (media_type, id) => {
-    setRatings((prev) =>
-      prev.filter((r) => !(r.id === id && r.media_type === media_type))
-    );
-  };
-
-  const getRating = (media_type, id) => {
-    const found = ratings.find(
-      (r) => r.id === id && r.media_type === media_type
-    );
-    return found?.rating ?? null;
-  };
-
   return (
-    <RatingsContext.Provider value={{ ratings, rate, unrate, getRating }}>
+    <RatingsContext.Provider
+      value={{
+        ratings,
+        rate,       // used by RatingModal.jsx
+        unrate,     // also used by RatingModal.jsx
+        getRating,
+        refresh,
+        loaded
+      }}
+    >
       {children}
     </RatingsContext.Provider>
   );
-}
-
-export function useRatings() {
-  return useContext(RatingsContext);
 }

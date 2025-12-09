@@ -1,56 +1,47 @@
-// index.mjs — Fully fixed Lambda backend
-// - Google OAuth verification
-// - DynamoDB CRUD
-// - TMDB Proxy (CORS-safe, never returns 204)
-// - Always returns JSON bodies with status 200 for browser compatibility
+// index.mjs — FINAL AWS SDK v3 VERSION
+// Google Login + DynamoDB + TMDB Proxy
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   QueryCommand,
   PutCommand,
-  DeleteCommand,
+  DeleteCommand
 } from "@aws-sdk/lib-dynamodb";
-
 import fetch from "node-fetch";
 import jwt from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 
-// =====================================================
-// CONFIGURATION
-// =====================================================
-const TABLE_NAME = process.env.TABLE_NAME || "MovieWatchlist";
+const TABLE_NAME = process.env.TABLE_NAME;            // "MovieWatchlist"
+const RATINGS_TABLE = process.env.RATINGS_TABLE_NAME; // "MovieRatings"
 const TMDB_KEY = process.env.TMDB_KEY;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 
-const ddbClient = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(ddbClient);
+// DynamoDB client
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-// JWKS client for Google tokens
+// Google JWKS client (secure token verification)
 const jwks = jwksClient({
   jwksUri: "https://www.googleapis.com/oauth2/v3/certs",
 });
 
 function getKey(header, callback) {
   jwks.getSigningKey(header.kid, (err, key) => {
-    if (err) return callback(err);
-    callback(null, key.getPublicKey());
+    if (err) callback(err);
+    else callback(null, key.getPublicKey());
   });
 }
 
-// =====================================================
-// RESPONSE HELPERS (always include CORS)
-// =====================================================
-function response(statusCode, bodyObj) {
+function res(status, body) {
   return {
-    statusCode,
+    statusCode: status,
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "*",
       "Access-Control-Allow-Methods": "*",
     },
-    body: JSON.stringify(bodyObj),
+    body: JSON.stringify(body),
   };
 }
 
@@ -61,8 +52,8 @@ async function verifyGoogleToken(idToken) {
       getKey,
       {
         algorithms: ["RS256"],
-        issuer: "https://accounts.google.com",
         audience: GOOGLE_CLIENT_ID,
+        issuer: "https://accounts.google.com",
       },
       (err, decoded) => {
         if (err) reject(err);
@@ -72,27 +63,19 @@ async function verifyGoogleToken(idToken) {
   });
 }
 
-// =====================================================
-// MAIN HANDLER
-// =====================================================
 export const handler = async (event) => {
-  console.log("Incoming request:", JSON.stringify(event));
+  console.log("EVENT:", event);
 
   const method = event.requestContext?.http?.method;
-  const path = event.rawPath || event.requestContext?.http?.path || "/";
+  const path = event.rawPath;
   const qs = event.queryStringParameters || {};
 
-  // ---------------------------
-  // GOOGLE AUTH CHECK
-  // ---------------------------
   const idToken =
-    event.headers["x-google-id-token"] || event.headers["X-Google-ID-Token"];
+    event.headers["x-google-id-token"] ||
+    event.headers["X-Google-ID-Token"];
 
   if (!idToken) {
-    return response(200, {
-      ok: false,
-      error: "Missing Google ID token",
-    });
+    return res(400, { ok: false, error: "Missing Google ID token" });
   }
 
   let decoded;
@@ -100,107 +83,65 @@ export const handler = async (event) => {
     decoded = await verifyGoogleToken(idToken);
   } catch (err) {
     console.error("Google token verification failed:", err);
-    return response(200, {
-      ok: false,
-      error: "Invalid Google ID token",
-      details: err.message,
-    });
+    return res(401, { ok: false, error: "Invalid Google ID token" });
   }
 
   const userId = decoded.sub;
-  console.log("Authenticated user:", userId);
 
-  // =====================================================
-  // ROUTING
-  // =====================================================
-  try {
-    // -----------------------------------------------------
-    // TMDB PROXY: /tmdb?endpoint=<tmdb-endpoint>
-    // ALWAYS returns 200 with JSON → no CORS issues
-    // -----------------------------------------------------
-    if (method === "GET" && path === "/tmdb") {
-      const endpoint = qs.endpoint;
-      if (!endpoint) {
-        return response(200, {
-          ok: false,
-          error: "Missing 'endpoint' query parameter",
-        });
-      }
+  // ---------------- TMDB PROXY ----------------
+  if (method === "GET" && path === "/tmdb") {
+    const endpoint = qs.endpoint;
 
-      const tmdbUrl = `https://api.themoviedb.org/3/${endpoint}${
-        endpoint.includes("?") ? "&" : "?"
-      }api_key=${TMDB_KEY}`;
+    if (!endpoint) return res(400, { ok: false, error: "Missing endpoint" });
 
-      console.log("Fetching TMDB:", tmdbUrl);
+    const url = `https://api.themoviedb.org/3/${endpoint}${
+      endpoint.includes("?") ? "&" : "?"
+    }api_key=${TMDB_KEY}`;
 
-      try {
-        const tmdbRes = await fetch(tmdbUrl);
-        const json = await tmdbRes.json().catch(() => ({}));
-
-        if (!tmdbRes.ok) {
-          return response(200, {
-            ok: false,
-            error: "TMDB request failed",
-            status: tmdbRes.status,
-            statusText: tmdbRes.statusText,
-            data: json,
-          });
-        }
-
-        return response(200, {
-          ok: true,
-          data: json,
-        });
-      } catch (err) {
-        return response(200, {
-          ok: false,
-          error: "TMDB fetch error",
-          details: err.message,
-        });
-      }
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      return res(200, { ok: true, data: j });
+    } catch (err) {
+      console.error("TMDB ERROR:", err);
+      return res(500, { ok: false, error: "TMDB proxy failed" });
     }
+  }
 
-    // -----------------------------------------------------
-    // GET WATCHLIST
-    // -----------------------------------------------------
-    if (method === "GET" && path === "/watchlist") {
-      const data = await ddb.send(
+  // ---------------- GET WATCHLIST ----------------
+  if (method === "GET" && path === "/watchlist") {
+    try {
+      const dbRes = await ddb.send(
         new QueryCommand({
           TableName: TABLE_NAME,
-          KeyConditionExpression: "userId = :uid",
-          ExpressionAttributeValues: { ":uid": userId },
+          KeyConditionExpression: "userId = :u",
+          ExpressionAttributeValues: { ":u": userId },
         })
       );
 
-      return response(200, {
-        ok: true,
-        items: data.Items || [],
-      });
+      return res(200, { ok: true, items: dbRes.Items ?? [] });
+    } catch (err) {
+      console.error("WATCHLIST GET ERROR:", err);
+      return res(500, { ok: false, error: "Failed to load watchlist" });
+    }
+  }
+
+  // ---------------- ADD/UPDATE WATCHLIST ----------------
+  if (method === "POST" && path === "/watchlist") {
+    let body = JSON.parse(event.body || "{}");
+
+    if (!body.itemId) {
+      return res(400, { ok: false, error: "itemId is required" });
     }
 
-    // -----------------------------------------------------
-    // ADD / UPDATE WATCHLIST ITEM
-    // -----------------------------------------------------
-    if (method === "POST" && path === "/watchlist") {
-      const body = JSON.parse(event.body || "{}");
+    const item = {
+      userId,
+      itemId: body.itemId,
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
 
-      if (!body.itemId) {
-        return response(200, {
-          ok: false,
-          error: "itemId is required",
-        });
-      }
-
-      const item = {
-        userId,
-        itemId: body.itemId,
-        title: body.title,
-        mediaType: body.mediaType,
-        status: body.status,
-        rating: body.rating,
-        updatedAt: new Date().toISOString(),
-      };
-
+    try {
       await ddb.send(
         new PutCommand({
           TableName: TABLE_NAME,
@@ -208,20 +149,18 @@ export const handler = async (event) => {
         })
       );
 
-      return response(200, {
-        ok: true,
-        item,
-      });
+      return res(200, { ok: true, item });
+    } catch (err) {
+      console.error("WATCHLIST PUT ERROR:", err);
+      return res(500, { ok: false, error: "Failed to save item" });
     }
+  }
 
-    // -----------------------------------------------------
-    // DELETE WATCHLIST ITEM
-    // MUST RETURN 200 (NOT 204) FOR CORS
-    // -----------------------------------------------------
-    if (method === "DELETE" && path.startsWith("/watchlist/")) {
-      const parts = path.split("/");
-      const itemId = decodeURIComponent(parts[2]);
+  // ---------------- DELETE WATCHLIST ----------------
+  if (method === "DELETE" && path.startsWith("/watchlist/")) {
+    const itemId = decodeURIComponent(path.split("/")[2]);
 
+    try {
       await ddb.send(
         new DeleteCommand({
           TableName: TABLE_NAME,
@@ -229,27 +168,12 @@ export const handler = async (event) => {
         })
       );
 
-      return response(200, {
-        ok: true,
-        deleted: itemId,
-      });
+      return res(200, { ok: true, deleted: itemId });
+    } catch (err) {
+      console.error("WATCHLIST DELETE ERROR:", err);
+      return res(500, { ok: false, error: "Failed to delete item" });
     }
-
-    // -----------------------------------------------------
-    // FALLBACK
-    // -----------------------------------------------------
-    return response(200, {
-      ok: false,
-      error: "Route not found",
-      path,
-      method,
-    });
-  } catch (err) {
-    console.error("Internal Lambda error:", err);
-    return response(200, {
-      ok: false,
-      error: "Internal server error",
-      details: err.message,
-    });
   }
+
+  return res(404, { ok: false, error: "Route not found", path, method });
 };

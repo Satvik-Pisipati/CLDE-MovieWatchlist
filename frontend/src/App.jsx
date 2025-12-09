@@ -7,10 +7,26 @@ import MainPage from "./pages/MainPage";
 import WatchlistPage from "./pages/WatchlistPage";
 import MyRatingsPage from "./pages/MyRatingsPage";
 
+import { AuthProvider } from "./state/AuthContext";
+import { WatchlistProvider } from "./state/WatchlistContext";
+import { RatingsProvider } from "./state/RatingsContext";
+
 export default function App() {
+  return (
+    <AuthProvider>
+      <WatchlistProvider>
+        <RatingsProvider>
+          <AppRoutes />
+        </RatingsProvider>
+      </WatchlistProvider>
+    </AuthProvider>
+  );
+}
+
+// actual routes moved into a component because provider cannot be inside <Routes>
+function AppRoutes() {
   const navigate = useNavigate();
 
-  // Load user from localStorage
   const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem("user");
@@ -20,26 +36,18 @@ export default function App() {
     }
   });
 
-  // Persist user
   useEffect(() => {
-    if (user) {
-      localStorage.setItem("user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("user");
-    }
+    if (user) localStorage.setItem("user", JSON.stringify(user));
+    else localStorage.removeItem("user");
   }, [user]);
 
-  // Login callback
   const handleLogin = (u) => {
     setUser(u);
     navigate("/home", { replace: true });
   };
 
-  // Logout
   const handleSignOut = () => {
-    try {
-      window.google?.accounts.id.disableAutoSelect();
-    } catch {}
+    window.google?.accounts.id.disableAutoSelect?.();
     localStorage.removeItem("user");
     setUser(null);
     navigate("/", { replace: true });
@@ -47,19 +55,10 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Login */}
       <Route path="/" element={<Login onLogin={handleLogin} />} />
-
-      {/* Dashboard */}
       <Route path="/dashboard" element={<Dashboard user={user} onSignOut={handleSignOut} />} />
-
-      {/* Main search page */}
       <Route path="/home" element={<MainPage user={user} />} />
-
-      {/* Watchlist */}
       <Route path="/watchlist" element={<WatchlistPage user={user} />} />
-
-      {/* Ratings */}
       <Route path="/ratings" element={<MyRatingsPage user={user} />} />
     </Routes>
   );

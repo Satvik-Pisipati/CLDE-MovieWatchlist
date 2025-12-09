@@ -4,12 +4,14 @@ import SkeletonCard from "../components/SkeletonCard.jsx";
 import FiltersBar from "../components/FiltersBar.jsx";
 import DetailsModal from "../components/DetailsModal.jsx";
 import RatingModal from "../components/RatingModal.jsx";
+
 import {
   searchTMDB,
   trendingTMDB,
-  recommendationsFromWatchlist,
   getGenres,
+  recommendationsFromWatchlist,
 } from "../api/tmdb.js";
+
 import { useWatchlist } from "../state/WatchlistContext.jsx";
 import { useRatings } from "../state/RatingsContext.jsx";
 
@@ -26,19 +28,22 @@ export default function MainPage() {
   const [categories, setCategories] = useState([]);
 
   const [open, setOpen] = useState(null);
+
   const { list, add, remove, isInList } = useWatchlist();
   const { ratings } = useRatings() || { ratings: [] };
 
-  // how many cards ≈ 2 rows
   const TRENDING_LIMIT = 10;
   const SUGGEST_LIMIT = 10;
 
-  // --- Load trending + categories initially ---
+  // Load trending + genre list on first mount
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [trend, gens] = await Promise.all([trendingTMDB(), getGenres()]);
+        const [trend, gens] = await Promise.all([
+          trendingTMDB(),
+          getGenres(),
+        ]);
         setTrending(trend);
         setCategories(gens);
       } finally {
@@ -47,7 +52,7 @@ export default function MainPage() {
     })();
   }, []);
 
-  // --- Generate suggestions based on watchlist + ratings ---
+  // Recommendations based on watchlist + ratings
   useEffect(() => {
     (async () => {
       const base = [...(list || []), ...(ratings || [])];
@@ -60,14 +65,16 @@ export default function MainPage() {
     })();
   }, [list, ratings]);
 
-  // --- Live search (debounced) ---
+  // Live search
   useEffect(() => {
     const q = query.trim();
+
     if (!q) {
       setResults([]);
       setLoading(false);
       return;
     }
+
     setLoading(true);
     const timeout = setTimeout(async () => {
       try {
@@ -77,6 +84,7 @@ export default function MainPage() {
         setLoading(false);
       }
     }, 350);
+
     return () => clearTimeout(timeout);
   }, [query]);
 
@@ -91,6 +99,7 @@ export default function MainPage() {
   const showingResults = results.length > 0 && query.trim().length > 0;
   const baseList = showingResults ? results : trending;
 
+  // Filtering + sorting
   const visible = useMemo(() => {
     let filtered = baseList;
 
@@ -121,7 +130,7 @@ export default function MainPage() {
     return sorted;
   }, [baseList, sort, type, category]);
 
-  // --- Modal open handler (details) ---
+  // Modal open listener
   useEffect(() => {
     const onOpen = (e) => setOpen(e.detail);
     window.addEventListener("detail-open", onOpen);
@@ -129,6 +138,7 @@ export default function MainPage() {
   }, []);
 
   const inList = open ? isInList(open.media_type, open.id) : false;
+
   const toggle = () => {
     if (!open) return;
     if (inList) {
@@ -144,14 +154,12 @@ export default function MainPage() {
   return (
     <div className="main-page">
       <div className="container">
-        {/* 1) Hero */}
-        <section
-          className="search-hero card page-wrap"
-          style={{ marginTop: "1rem" }}
-        >
+        {/* HERO */}
+        <section className="search-hero card page-wrap" style={{ marginTop: "1rem" }}>
           <h1 className="hero-brand">MovieWatchlist 🎬</h1>
           <h2 className="hero-title">Find your next movie or show</h2>
           <p className="hero-sub">Search across movies, series, and more.</p>
+
           <form onSubmit={handleSearchSubmit} className="search-form">
             <input
               className="input"
@@ -159,13 +167,11 @@ export default function MainPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button type="submit" className="btn primary">
-              Search
-            </button>
+            <button type="submit" className="btn primary">Search</button>
           </form>
         </section>
 
-        {/* 2) Filter bar + main grid (Trending or Search Results) */}
+        {/* RESULTS */}
         <section className="results page-wrap">
           <FiltersBar
             sort={sort}
@@ -184,17 +190,11 @@ export default function MainPage() {
           <div className="media-grid">
             {loading
               ? Array.from({ length: 12 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))
-              : (showingResults
-                ? visible
-                : visible.slice(0, TRENDING_LIMIT)
-              ).map((item) => (
-                <MediaCard
-                  key={`${item.media_type}-${item.id}`}
-                  item={item}
-                />
-              ))}
+                  <SkeletonCard key={i} />
+                ))
+              : (showingResults ? visible : visible.slice(0, TRENDING_LIMIT)).map((item) => (
+                  <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
+                ))}
           </div>
 
           {!loading && showingResults && visible.length === 0 && (
@@ -202,7 +202,7 @@ export default function MainPage() {
           )}
         </section>
 
-        {/* 3) Empfehlungen – only when not searching, after Trending */}
+        {/* SUGGESTIONS */}
         {!showingResults && suggestions.length > 0 && (
           <section className="results page-wrap">
             <h3 className="section-title">
@@ -213,10 +213,7 @@ export default function MainPage() {
             </p>
             <div className="media-grid">
               {suggestions.slice(0, SUGGEST_LIMIT).map((item) => (
-                <MediaCard
-                  key={`${item.media_type}-${item.id}`}
-                  item={item}
-                />
+                <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
               ))}
             </div>
           </section>
