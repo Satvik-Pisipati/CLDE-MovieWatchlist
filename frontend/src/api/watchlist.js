@@ -1,33 +1,19 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+import { apiFetch } from "./client";
 
-function authHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "X-Google-ID-Token": localStorage.getItem("google_id_token"),
-  };
+export async function loadWatchlist() {
+  const data = await apiFetch("/watchlist");
+  return data.items || [];
 }
 
-export async function getWatchlist() {
-  const res = await fetch(`${BACKEND_URL}/watchlist`, {
-    method: "GET",
-    headers: authHeaders(),
-  });
-  return (await res.json()).items || [];
-}
-
-export async function addToWatchlist(item) {
-  const res = await fetch(`${BACKEND_URL}/watchlist`, {
+export async function saveWatchlistItem(item) {
+  return apiFetch("/watchlist", {
     method: "POST",
-    headers: authHeaders(),
     body: JSON.stringify(item),
   });
-  return await res.json();
 }
 
-export async function deleteFromWatchlist(itemId) {
-  const res = await fetch(`${BACKEND_URL}/watchlist/${itemId}`, {
+export async function deleteWatchlistItem(itemId) {
+  return apiFetch(`/watchlist/${itemId}`, {
     method: "DELETE",
-    headers: authHeaders(),
   });
-  return await res.json();
 }
