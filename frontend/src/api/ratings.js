@@ -9,7 +9,13 @@ export async function getRatings() {
 export async function rateItem(item, rating) {
   return apiFetch("/user/rate", {
     method: "POST",
-    body: JSON.stringify({item, rating}) 
+    body: JSON.stringify({
+      id: item.id,
+      media_type: item.media_type,
+      rating,
+      title: item.title || item.name || "",
+      poster_path: item.poster_path || null,
+    }),
   });
 }
 

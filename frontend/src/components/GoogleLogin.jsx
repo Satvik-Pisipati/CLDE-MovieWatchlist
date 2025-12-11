@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "../state/AuthContext.jsx";
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+const BACKEND = import.meta.env.VITE_BACKEND_URL
 
 export default function GoogleLogin() {
   const btnRef = useRef(null);

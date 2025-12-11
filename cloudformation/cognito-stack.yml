@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: MovieWatchlist Cognito Stack
+
+Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    Properties:
+      UserPoolName: movie-watchlist-users
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DeletionPolicy: Retain
+    Properties:
+      ClientName: frontend
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - http://movie-watchlist-frontend-nathalie.s3-website-us-east-1.amazonaws.com
+      LogoutURLs:
+        - http://movie-watchlist-frontend-nathalie.s3-website-us-east-1.amazonaws.com
+      SupportedIdentityProviders:
+        - COGNITO
+
+  CognitoDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    DeletionPolicy: Retain
+    Properties:
+      Domain: movie-watchlist-auth
+      UserPoolId: !Ref CognitoUserPool

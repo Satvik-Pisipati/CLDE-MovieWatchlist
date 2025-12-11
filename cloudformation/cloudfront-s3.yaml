@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFront Distribution fuer MovieWatchlist S3 Frontend
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: movie-watchlist-frontend-nathalie
+    Description: Name des bestehenden S3 Buckets mit dem Frontend (ohne s3://)
+
+Resources:
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: MovieWatchlist Frontend ueber CloudFront
+        DefaultRootObject: index.html
+
+        Origins:
+          - Id: S3WebsiteOrigin
+            DomainName: !Sub "${BucketName}.s3-website-${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: none
+
+        PriceClass: PriceClass_100
+
+Outputs:
+  CloudFrontDomain:
+    Description: CloudFront Domain fuer das Frontend
+    Value: !GetAtt FrontendDistribution.DomainName
