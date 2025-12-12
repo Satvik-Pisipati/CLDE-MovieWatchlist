@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRatings } from "../state/RatingsContext.jsx";
+import { useWatchlist } from "../state/WatchlistContext.jsx";
 import MediaCard from "../components/MediaCard.jsx";
 import DetailsModal from "../components/DetailsModal.jsx";
 import RatingModal from "../components/RatingModal.jsx";
-import { useWatchlist } from "../state/WatchlistContext.jsx";
 
 export default function MyRatingsPage() {
-  const { ratings } = useRatings() || { ratings: [] };
-  const watch = useWatchlist() || {};
+  const { ratings } = useRatings();
+  const { add, remove, isInList } = useWatchlist();
   const [open, setOpen] = useState(null);
 
   useEffect(() => {
@@ -18,14 +18,15 @@ export default function MyRatingsPage() {
   }, []);
 
   const inList =
-    open && watch.isInList
-      ? watch.isInList(open.media_type, open.id)
-      : false;
+    open ? isInList(open.media_type, open.id) : false;
 
   const toggle = () => {
-    if (!open || !watch.add || !watch.remove) return;
-    if (inList) watch.remove(open.media_type, open.id);
-    else watch.add({ ...open, title: open.title || open.name });
+    if (!open) return;
+    if (inList) {
+      remove(open.media_type, open.id);
+    } else {
+      add({ ...open, title: open.title || open.name });
+    }
   };
 
   return (
@@ -40,13 +41,10 @@ export default function MyRatingsPage() {
             marginBottom: 12,
           }}
         >
-          <h1
-            className="section-title"
-            style={{ fontSize: "1.6rem", margin: 0 }}
-          >
+          <h1 className="section-title" style={{ fontSize: "1.6rem", margin: 0 }}>
             Meine Bewertungen
           </h1>
-          <Link to="/home" className="btn ghost">
+          <Link to="/" className="btn ghost">
             Zur Suche
           </Link>
         </div>

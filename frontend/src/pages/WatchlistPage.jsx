@@ -6,10 +6,7 @@ import DetailsModal from "../components/DetailsModal.jsx";
 import RatingModal from "../components/RatingModal.jsx";
 
 export default function WatchlistPage() {
-  const ctx = useWatchlist();
-  const entries = ctx?.list || [];
-  const { add, remove, isInList } = ctx || {};
-
+  const { items, add, remove, isInList } = useWatchlist();
   const [open, setOpen] = useState(null);
 
   useEffect(() => {
@@ -19,19 +16,14 @@ export default function WatchlistPage() {
   }, []);
 
   const inList =
-    open && typeof isInList === "function"
-      ? isInList(open.media_type, open.id)
-      : false;
+    open ? isInList(open.media_type, open.id) : false;
 
   const toggle = () => {
-    if (!open || !add || !remove) return;
+    if (!open) return;
     if (inList) {
       remove(open.media_type, open.id);
     } else {
-      add({
-        ...open,
-        title: open.title || open.name,
-      });
+      add({ ...open, title: open.title || open.name });
     }
   };
 
@@ -47,29 +39,26 @@ export default function WatchlistPage() {
             marginBottom: 12,
           }}
         >
-          <h1
-            className="section-title"
-            style={{ fontSize: "1.6rem", margin: 0 }}
-          >
+          <h1 className="section-title" style={{ fontSize: "1.6rem", margin: 0 }}>
             Deine Watchlist
           </h1>
-          <Link to="/home" className="btn ghost">
+          <Link to="/" className="btn ghost">
             Zur Suche
           </Link>
         </div>
 
-        {entries.length === 0 ? (
+        {items.length === 0 ? (
           <div className="card empty-state" style={{ padding: "1rem" }}>
             Deine Watchlist ist leer. Füge Titel über die Suche hinzu.
             <div style={{ marginTop: 12 }}>
-              <Link to="/home" className="btn primary">
+              <Link to="/" className="btn primary">
                 Jetzt suchen
               </Link>
             </div>
           </div>
         ) : (
           <div className="media-grid">
-            {entries.map((it) => (
+            {items.map((it) => (
               <MediaCard key={`${it.media_type}-${it.id}`} item={it} />
             ))}
           </div>

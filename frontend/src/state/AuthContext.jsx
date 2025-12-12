@@ -1,54 +1,57 @@
 // src/state/AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-const AuthContext = createContext();
-export const useAuth = () => useContext(AuthContext);
+const STORAGE_KEY = "google_id_token";
 
-export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() =>
-    localStorage.getItem("google_id_token")
-  );
+const AuthContext = createContext(null);
 
-  const [user, setUser] = useState(() => {
-    const t = localStorage.getItem("google_id_token");
-    return t ? decodeJwt(t) : null;
-  });
-
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem("google_id_token", token);
-      setUser(decodeJwt(token));
-    } else {
-      localStorage.removeItem("google_id_token");
-      setUser(null);
-    }
-  }, [token]);
-
-  function loginWithGoogle(idToken) {
-    setToken(idToken);
-  }
-
-  function logout() {
-    setToken(null);
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token, loginWithGoogle, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+export function getStoredGoogleIdToken() {
+  return localStorage.getItem(STORAGE_KEY);
 }
 
 function decodeJwt(token) {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const payload = token.split(".")[1];
+    const decoded = JSON.parse(atob(payload));
     return {
-      sub: payload.sub,
-      name: payload.name,
-      email: payload.email,
-      picture: payload.picture,
+      sub: decoded.sub,
+      name: decoded.name,
+      email: decoded.email,
+      picture: decoded.picture,
     };
   } catch {
     return null;
   }
+}
+
+export function AuthProvider({ children }) {
+  const [token, setToken] = useState(() => getStoredGoogleIdToken());
+  const [user, setUser] = useState(() => (token ? decodeJwt(token) : null));
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem(STORAGE_KEY, token);
+      setUser(decodeJwt(token));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+      setUser(null);
+    }
+  }, [token]);
+
+  const value = useMemo(
+    () => ({
+      token,
+      user,
+      isAuthenticated: !!token,
+      loginWithGoogle: (idToken) => setToken(idToken),
+      logout: () => setToken(null),
+    }),
+    [token, user]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
 }

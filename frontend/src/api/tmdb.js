@@ -1,56 +1,44 @@
 // src/api/tmdb.js
 import { apiFetch } from "./client";
 
-/**
- * Helper used by UI components to build TMDB poster URLs.
- * Works even when poster_path is missing.
- */
-export function posterUrl(posterPath, size = "w500") {
-  if (!posterPath) return "";
-  return `https://image.tmdb.org/t/p/${size}${posterPath}`;
+export function posterUrl(path, size = "w500") {
+  if (!path) return "";
+  return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
-/**
- * Generic TMDB proxy call (useful for StatsPage or any custom endpoint)
- */
+// Generic TMDB proxy call through your backend: GET /tmdb?endpoint=...
 export async function fetchTMDB(endpoint) {
   const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data || null;
+  return data?.data || {};
 }
 
 export async function trendingTMDB() {
-  const endpoint = "trending/all/week?language=de-DE";
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data?.results || [];
+  const json = await fetchTMDB("trending/all/week?language=de-DE");
+  return json?.results || [];
 }
 
 export async function getGenres() {
-  const endpoint = "genre/movie/list?language=de-DE";
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data?.genres || [];
+  const json = await fetchTMDB("genre/movie/list?language=de-DE");
+  return json?.genres || [];
 }
 
 export async function searchTMDB(query) {
-  const q = (query || "").trim();
-  if (!q) return [];
-
-  const endpoint = `search/multi?query=${encodeURIComponent(q)}&language=de-DE`;
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data?.results || [];
+  if (!query?.trim()) return [];
+  const q = encodeURIComponent(query.trim());
+  const json = await fetchTMDB(`search/multi?query=${q}&language=de-DE`);
+  // Filter out "person" so MediaCard doesn’t break
+  return (json?.results || []).filter((r) => r.media_type !== "person");
 }
 
 export async function recommendationsFromWatchlist(items) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-
+  if (!items?.length) return [];
   const first = items[0];
+  const mediaType = first.media_type || "movie";
+  const tmdbId = first.id || first.tmdbId;
+  if (!tmdbId) return [];
 
-  // we store original TMDB id + media_type in DynamoDB
-  const mediaType = first.media_type;
-  const id = first.id;
-
-  if (!mediaType || !id) return [];
-
-  const endpoint = `${mediaType}/${id}/recommendations?language=de-DE`;
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data?.results || [];
+  const json = await fetchTMDB(
+    `${mediaType}/${tmdbId}/recommendations?language=de-DE`
+  );
+  return json?.results || [];
 }

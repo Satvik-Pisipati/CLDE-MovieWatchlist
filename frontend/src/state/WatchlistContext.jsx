@@ -1,99 +1,90 @@
 // src/state/WatchlistContext.jsx
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
+import { useAuth } from "./AuthContext.jsx";
 
 const WatchlistContext = createContext(null);
 
-export function WatchlistProvider({ children }) {
-  const [items, setItems] = useState([]);
-  const [loaded, setLoaded] = useState(false);
+const makeItemId = (media_type, id) => `${media_type}_${id}`;
 
-  async function refreshWatchlist() {
-    try {
-      const res = await apiFetch("/watchlist");
-      setItems(res.items || []);
-    } catch (e) {
-      console.warn("Watchlist refresh failed:", e?.message || e);
+const normalize = (item) => {
+  const media_type = item.media_type;
+  const id = item.id;
+
+  return {
+    ...item,
+    media_type,
+    id,
+    itemId: item.itemId || makeItemId(media_type, id),
+    title: item.title || item.name || "",
+  };
+};
+
+export function WatchlistProvider({ children }) {
+  const { isAuthenticated } = useAuth();
+  const [items, setItems] = useState([]);
+
+  async function refresh() {
+    if (!isAuthenticated) {
       setItems([]);
-    } finally {
-      setLoaded(true);
+      return;
     }
+    const res = await apiFetch("/watchlist");
+    setItems(res.items || []);
   }
 
   useEffect(() => {
-    refreshWatchlist();
-  }, []);
+    refresh();
+    const sync = () => refresh();
+    window.addEventListener("mw:sync", sync);
+    return () => window.removeEventListener("mw:sync", sync);
+  }, [isAuthenticated]);
 
-  function makeItemId(media_type, id) {
-    return `${media_type}_${id}`;
+  function isInList(media_type, id) {
+    const itemId = makeItemId(media_type, id);
+    return items.some((i) => i.itemId === itemId);
   }
 
-  function isInWatchlist(media_type, id) {
-    return items.some((x) => x?.media_type === media_type && String(x?.id) === String(id));
-  }
-
-  async function addToWatchlist(tmdbItem) {
-    const media_type = tmdbItem.media_type;
-    const id = tmdbItem.id;
-
-    if (!media_type || !id) throw new Error("Missing media_type or id");
-
-    const item = {
-      itemId: makeItemId(media_type, id), // REQUIRED by backend
-      id,
-      media_type,
-      title: tmdbItem.title || tmdbItem.name || "",
-      poster_path: tmdbItem.poster_path || "",
-      backdrop_path: tmdbItem.backdrop_path || "",
-      vote_average: tmdbItem.vote_average ?? null,
-      release_date: tmdbItem.release_date || tmdbItem.first_air_date || "",
-    };
+  async function add(item) {
+    const payload = normalize(item);
 
     await apiFetch("/watchlist", {
       method: "POST",
-      body: JSON.stringify(item),
+      body: JSON.stringify(payload),
     });
 
-    await refreshWatchlist();
+    setItems((prev) =>
+      prev.some((i) => i.itemId === payload.itemId)
+        ? prev
+        : [payload, ...prev]
+    );
+
+    window.dispatchEvent(new Event("mw:sync"));
   }
 
-  async function removeFromWatchlist(media_type, id) {
+  async function remove(media_type, id) {
     const itemId = makeItemId(media_type, id);
+
     await apiFetch(`/watchlist/${encodeURIComponent(itemId)}`, {
       method: "DELETE",
     });
-    await refreshWatchlist();
-  }
 
-  async function toggleWatchlist(tmdbItem) {
-    const media_type = tmdbItem?.media_type;
-    const id = tmdbItem?.id;
-
-    if (!media_type || !id) return;
-
-    if (isInWatchlist(media_type, id)) {
-      await removeFromWatchlist(media_type, id);
-    } else {
-      await addToWatchlist(tmdbItem);
-    }
+    setItems((prev) => prev.filter((i) => i.itemId !== itemId));
+    window.dispatchEvent(new Event("mw:sync"));
   }
 
   const value = useMemo(
-    () => ({
-      items,
-      loaded,
-      refreshWatchlist,
-      toggleWatchlist,
-      isInWatchlist,
-    }),
-    [items, loaded]
+    () => ({ items, add, remove, isInList }),
+    [items]
   );
 
-  return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
+  return (
+    <WatchlistContext.Provider value={value}>
+      {children}
+    </WatchlistContext.Provider>
+  );
 }
 
 export function useWatchlist() {
-  const ctx = useContext(WatchlistContext);
-  if (!ctx) throw new Error("useWatchlist must be used inside WatchlistProvider");
-  return ctx;
+  return useContext(WatchlistContext);
 }
