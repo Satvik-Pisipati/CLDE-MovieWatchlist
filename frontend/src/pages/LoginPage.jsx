@@ -1,38 +1,22 @@
-import { useAuth } from "../state/AuthContext";
-import { useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
- 
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../state/AuthContext";
+
 export default function LoginPage() {
   const { loginWithGoogle } = useAuth();
   const navigate = useNavigate();
- 
-  const handleSuccess = (response) => {
-    try {
-      console.log("Google Login success:", response);
- 
-      // Google returns { credential: "<JWT>" }
-      if (!response || !response.credential) {
-        throw new Error("Missing credential field in Google response");
-      }
- 
-      loginWithGoogle(response.credential);
-      navigate("/");
-    } catch (err) {
-      console.error("Failed to handle Google credential:", err);
-    }
-  };
- 
-  const handleError = () => {
-    console.error("Google Login failed");
-  };
- 
+
   return (
     <div className="login-page">
-      <h1>Login</h1>
- 
+      <h1>Sign In</h1>
+
       <GoogleLogin
-        onSuccess={handleSuccess}
-        onError={handleError}
+        onSuccess={(res) => {
+          if (!res?.credential) return;
+          loginWithGoogle(res.credential);
+          navigate("/", { replace: true });
+        }}
+        onError={() => console.error("Google Login failed")}
       />
     </div>
   );

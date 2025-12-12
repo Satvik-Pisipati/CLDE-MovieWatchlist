@@ -1,232 +1,162 @@
+// src/pages/MainPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import MediaCard from "../components/MediaCard.jsx";
-import SkeletonCard from "../components/SkeletonCard.jsx";
-import FiltersBar from "../components/FiltersBar.jsx";
-import DetailsModal from "../components/DetailsModal.jsx";
-import RatingModal from "../components/RatingModal.jsx";
-
 import {
-  searchTMDB,
   trendingTMDB,
-  getGenres,
+  searchTMDB,
   recommendationsFromWatchlist,
-} from "../api/tmdb.js";
-
-import { useWatchlist } from "../state/WatchlistContext.jsx";
-import { useRatings } from "../state/RatingsContext.jsx";
+  posterUrl,
+} from "../api/tmdb";
+import { useWatchlist } from "../state/WatchlistContext";
 
 export default function MainPage() {
+  const { items: watchlist, loaded, toggleWatchlist, isInWatchlist } = useWatchlist();
+
+  const [mode, setMode] = useState("trending"); // trending | search | recs
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
-  const [trending, setTrending] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [recs, setRecs] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const [sort, setSort] = useState("popularity");
-  const [type, setType] = useState("all");
-  const [category, setCategory] = useState("all");
-  const [categories, setCategories] = useState([]);
-
-  const [open, setOpen] = useState(null);
-
-  const { list, add, remove, isInList } = useWatchlist();
-  const { ratings } = useRatings() || { ratings: [] };
-
-  const TRENDING_LIMIT = 10;
-  const SUGGEST_LIMIT = 10;
-
-  // Load trending + genre list on first mount
+  // Load trending by default
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    async function run() {
       setLoading(true);
       try {
-        const [trend, gens] = await Promise.all([
-          trendingTMDB(),
-          getGenres(),
-        ]);
-        setTrending(trend);
-        setCategories(gens);
+        const data = await trendingTMDB();
+        if (!cancelled) {
+          setResults(data.filter((x) => x && (x.media_type === "movie" || x.media_type === "tv")));
+          setMode("trending");
+        }
+      } catch (e) {
+        console.warn("Trending load failed:", e?.message || e);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    })();
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Recommendations based on watchlist + ratings
+  // Load recommendations whenever watchlist changes
   useEffect(() => {
-    (async () => {
-      const base = [...(list || []), ...(ratings || [])];
-      if (base.length === 0) {
-        setSuggestions([]);
+    let cancelled = false;
+
+    async function run() {
+      if (!loaded) return;
+      if (!watchlist.length) {
+        setRecs([]);
         return;
       }
-      const recs = await recommendationsFromWatchlist(base);
-      setSuggestions(recs);
-    })();
-  }, [list, ratings]);
-
-  // Live search
-  useEffect(() => {
-    const q = query.trim();
-
-    if (!q) {
-      setResults([]);
-      setLoading(false);
-      return;
+      try {
+        const data = await recommendationsFromWatchlist(watchlist);
+        if (!cancelled) setRecs(data.filter((x) => x && (x.media_type === "movie" || x.media_type === "tv")));
+      } catch (e) {
+        console.warn("Recommendations failed:", e?.message || e);
+        if (!cancelled) setRecs([]);
+      }
     }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [watchlist, loaded]);
+
+  const shown = useMemo(() => {
+    if (mode === "recs") return recs;
+    return results;
+  }, [mode, results, recs]);
+
+  async function onSearchSubmit(e) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
 
     setLoading(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const data = await searchTMDB(q);
-        setResults(data);
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
-
-    return () => clearTimeout(timeout);
-  }, [query]);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (!query.trim()) {
-      setResults([]);
+    try {
+      const data = await searchTMDB(q);
+      setResults(data.filter((x) => x && (x.media_type === "movie" || x.media_type === "tv")));
+      setMode("search");
+    } catch (e2) {
+      console.warn("Search failed:", e2?.message || e2);
+    } finally {
       setLoading(false);
     }
-  };
-
-  const showingResults = results.length > 0 && query.trim().length > 0;
-  const baseList = showingResults ? results : trending;
-
-  // Filtering + sorting
-  const visible = useMemo(() => {
-    let filtered = baseList;
-
-    if (type !== "all") {
-      filtered = filtered.filter((i) => i.media_type === type);
-    }
-
-    if (category !== "all") {
-      const cid = Number(category);
-      filtered = filtered.filter(
-        (i) => Array.isArray(i.genre_ids) && i.genre_ids.includes(cid)
-      );
-    }
-
-    const sorted = [...filtered].sort((a, b) => {
-      if (sort === "title")
-        return (a.title || a.name || "").localeCompare(b.title || b.name || "");
-      if (sort === "date")
-        return (
-          new Date(b.release_date || b.first_air_date || 0) -
-          new Date(a.release_date || a.first_air_date || 0)
-        );
-      if (sort === "rating")
-        return (b.vote_average || 0) - (a.vote_average || 0);
-      return (b.popularity || 0) - (a.popularity || 0);
-    });
-
-    return sorted;
-  }, [baseList, sort, type, category]);
-
-  // Modal open listener
-  useEffect(() => {
-    const onOpen = (e) => setOpen(e.detail);
-    window.addEventListener("detail-open", onOpen);
-    return () => window.removeEventListener("detail-open", onOpen);
-  }, []);
-
-  const inList = open ? isInList(open.media_type, open.id) : false;
-
-  const toggle = () => {
-    if (!open) return;
-    if (inList) {
-      remove(open.media_type, open.id);
-    } else {
-      add({
-        ...open,
-        title: open.title || open.name,
-      });
-    }
-  };
+  }
 
   return (
-    <div className="main-page">
-      <div className="container">
-        {/* HERO */}
-        <section className="search-hero card page-wrap" style={{ marginTop: "1rem" }}>
-          <h1 className="hero-brand">MovieWatchlist 🎬</h1>
-          <h2 className="hero-title">Find your next movie or show</h2>
-          <p className="hero-sub">Search across movies, series, and more.</p>
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 18 }}>
+        <button onClick={() => setMode("trending")}>Trending</button>
+        <button onClick={() => setMode("recs")} disabled={!watchlist.length}>
+          Empfehlungen aus Watchlist
+        </button>
 
-          <form onSubmit={handleSearchSubmit} className="search-form">
-            <input
-              className="input"
-              placeholder="Search for a title..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button type="submit" className="btn primary">Search</button>
-          </form>
-        </section>
-
-        {/* RESULTS */}
-        <section className="results page-wrap">
-          <FiltersBar
-            sort={sort}
-            setSort={setSort}
-            type={type}
-            setType={setType}
-            category={category}
-            setCategory={setCategory}
-            categories={categories}
+        <form onSubmit={onSearchSubmit} style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search movies/series…"
+            style={{ padding: 8, minWidth: 280 }}
           />
-
-          <h3 className="section-title" style={{ marginTop: "12px" }}>
-            {showingResults ? "Suchergebnisse" : "Trending Now"}
-          </h3>
-
-          <div className="media-grid">
-            {loading
-              ? Array.from({ length: 12 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))
-              : (showingResults ? visible : visible.slice(0, TRENDING_LIMIT)).map((item) => (
-                  <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
-                ))}
-          </div>
-
-          {!loading && showingResults && visible.length === 0 && (
-            <p className="empty-state">Keine Ergebnisse.</p>
-          )}
-        </section>
-
-        {/* SUGGESTIONS */}
-        {!showingResults && suggestions.length > 0 && (
-          <section className="results page-wrap">
-            <h3 className="section-title">
-              Empfehlungen aus deiner Watchlist / Bewertungen
-            </h3>
-            <p className="section-sub">
-              Basierend auf deinen Listen und Bewertungen.
-            </p>
-            <div className="media-grid">
-              {suggestions.slice(0, SUGGEST_LIMIT).map((item) => (
-                <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
-              ))}
-            </div>
-          </section>
-        )}
+          <button type="submit">Search</button>
+        </form>
       </div>
 
-      <DetailsModal
-        item={open}
-        onClose={() => setOpen(null)}
-        onToggleList={toggle}
-        inList={inList}
-      />
-      <RatingModal />
+      {loading && <div style={{ opacity: 0.8 }}>Loading…</div>}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 16,
+          marginTop: 16,
+        }}
+      >
+        {shown.map((item) => {
+          const media_type = item.media_type;
+          const id = item.id;
+          const title = item.title || item.name || "Untitled";
+          const inList = isInWatchlist(media_type, id);
+
+          return (
+            <div
+              key={`${media_type}_${id}`}
+              style={{
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 14,
+                padding: 12,
+              }}
+            >
+              <div style={{ aspectRatio: "2/3", overflow: "hidden", borderRadius: 12, marginBottom: 10 }}>
+                {item.poster_path ? (
+                  <img
+                    src={posterUrl(item.poster_path, "w500")}
+                    alt={title}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", background: "rgba(255,255,255,0.06)" }} />
+                )}
+              </div>
+
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>{title}</div>
+              <div style={{ opacity: 0.8, fontSize: 13, marginBottom: 10 }}>
+                {media_type?.toUpperCase()} • ⭐ {item.vote_average ?? "-"}
+              </div>
+
+              <button onClick={() => toggleWatchlist(item)} style={{ width: "100%" }}>
+                {inList ? "Remove from Watchlist" : "Add to Watchlist"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

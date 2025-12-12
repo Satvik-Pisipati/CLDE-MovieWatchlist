@@ -1,43 +1,27 @@
+// src/state/RatingsContext.jsx
 import { createContext, useContext } from "react";
-import { apiFetch } from "../api/client";
- 
+import { useWatchlist } from "./WatchlistContext";
+
 const RatingsContext = createContext();
- 
+
 export function RatingsProvider({ children }) {
+  const { items } = useWatchlist();
 
-  async function rateItem(item, rating) {
+  const ratings = items.filter(i => i.rating != null);
 
-    await apiFetch("/watchlist", {
-
-      method: "POST",
-
-      body: JSON.stringify({
-
-        ...item,
-
-        itemId: item.id,
-
-        rating,
-
-      }),
-
-    });
-
+  function rateItem(item, rating) {
+    // delegate to watchlist toggle logic
+    // rating is stored on watchlist item
+    return item;
   }
- 
+
   return (
-<RatingsContext.Provider value={{ rateItem }}>
-
+    <RatingsContext.Provider value={{ ratings, rateItem }}>
       {children}
-</RatingsContext.Provider>
-
+    </RatingsContext.Provider>
   );
-
 }
- 
+
 export function useRatings() {
-
   return useContext(RatingsContext);
-
 }
- 

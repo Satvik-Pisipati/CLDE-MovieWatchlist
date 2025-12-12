@@ -1,16 +1,14 @@
 // src/state/AuthContext.jsx
-
 import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() =>
     localStorage.getItem("google_id_token")
   );
+
   const [user, setUser] = useState(() => {
     const t = localStorage.getItem("google_id_token");
     return t ? decodeJwt(t) : null;
@@ -31,20 +29,11 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    localStorage.removeItem("google_id_token");
     setToken(null);
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!token,
-        loginWithGoogle,
-        logout
-      }}
-    >
+    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -52,13 +41,12 @@ export function AuthProvider({ children }) {
 
 function decodeJwt(token) {
   try {
-    const payload = token.split(".")[1];
-    const decoded = JSON.parse(atob(payload));
+    const payload = JSON.parse(atob(token.split(".")[1]));
     return {
-      sub: decoded.sub,
-      name: decoded.name,
-      email: decoded.email,
-      picture: decoded.picture
+      sub: payload.sub,
+      name: payload.name,
+      email: payload.email,
+      picture: payload.picture,
     };
   } catch {
     return null;
