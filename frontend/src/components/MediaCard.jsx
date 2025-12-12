@@ -23,51 +23,39 @@ export default function MediaCard({ item }) {
   const displayTitle = title || name || "Unbenannt";
   const date = release_date || first_air_date || "";
 
-  const inList = watch.isInList
-    ? watch.isInList(media_type, id)
-    : false;
+  const inList = watch.isInList ? watch.isInList(id) : false;
 
   const existingRating = ratings.getRating
-    ? ratings.getRating(media_type, id)
+    ? ratings.getRating(id)
     : null;
 
-  // --- OPEN DETAILS ---
   const openDetails = () => {
     window.dispatchEvent(
       new CustomEvent("detail-open", {
-        detail: {
-          ...item,
-          media_type,
-          title: displayTitle,
-        },
+        detail: { ...item, media_type, title: displayTitle },
       })
     );
   };
 
-  // --- OPEN RATING POPUP ---
   const openRating = (e) => {
     e.stopPropagation();
     window.dispatchEvent(
       new CustomEvent("rating-open", {
-        detail: {
-          ...item,
-          media_type,
-          title: displayTitle,
-        },
+        detail: { ...item, media_type, title: displayTitle },
       })
     );
   };
 
-  // --- ADD / REMOVE WATCHLIST ---
   const toggleWatchlist = (e) => {
     e.stopPropagation();
     if (!watch.add || !watch.remove) return;
 
     if (inList) {
-      watch.remove(media_type, id);
+      watch.remove(id);
     } else {
       watch.add({
         ...item,
+        id,
         media_type,
         title: displayTitle,
       });
@@ -76,7 +64,6 @@ export default function MediaCard({ item }) {
 
   return (
     <article className="card media-card" onClick={openDetails}>
-      {/* IMAGE */}
       {poster_path ? (
         <img
           className="poster"
@@ -88,50 +75,23 @@ export default function MediaCard({ item }) {
         <div className="poster placeholder">Kein Bild</div>
       )}
 
-      {/* CONTENT */}
       <div className="content">
-        <h3 className="title" title={displayTitle}>
-          {displayTitle}
-        </h3>
+        <h3 className="title">{displayTitle}</h3>
 
-        {/* META INFORMATION */}
         <div className="meta">
           <span className="pill">
             {media_type === "tv" ? "SERIES" : "MOVIE"}
           </span>
-
           {date && <span>{date}</span>}
-
-          {vote_average != null && (
-            <span>★ {vote_average.toFixed(1)}</span>
-          )}
+          {vote_average != null && <span>★ {vote_average.toFixed(1)}</span>}
         </div>
 
-        {/* ACTIONS → vertical stacked buttons */}
-        <div
-          className="actions"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            marginTop: 8,
-          }}
-        >
-          {/* WATCHLIST BUTTON */}
-          <button
-            className={`btn ${inList ? "" : "primary"}`}
-            onClick={toggleWatchlist}
-            style={{ width: "100%" }}
-          >
+        <div className="actions" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button className={`btn ${inList ? "" : "primary"}`} onClick={toggleWatchlist}>
             {inList ? "Aus Watchlist entfernen" : "Zur Watchlist"}
           </button>
 
-          {/* RATING BUTTON */}
-          <button
-            className="btn ghost"
-            onClick={openRating}
-            style={{ width: "100%" }}
-          >
+          <button className="btn ghost" onClick={openRating}>
             {existingRating != null
               ? `Bewertet: ${existingRating}/5 ⭐`
               : "Bewerten"}

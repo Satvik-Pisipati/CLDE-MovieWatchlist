@@ -1,80 +1,79 @@
-// src/state/RatingsContext.jsx
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
-import { useAuth } from "./AuthContext.jsx";
 
 const RatingsContext = createContext(null);
-const makeItemId = (media_type, id) => `${media_type}_${id}`;
+
+export function useRatings() {
+  return useContext(RatingsContext);
+}
+
+// Normalize item → backend payload
+function toRatingPayload(item, rating) {
+  return {
+    itemId: String(item.id ?? item.itemId),
+    rating,
+  };
+}
 
 export function RatingsProvider({ children }) {
-  const { isAuthenticated } = useAuth();
-  const [ratings, setRatings] = useState([]);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  async function refresh() {
-    if (!isAuthenticated) {
-      setRatings([]);
-      return;
+  async function refreshRatings() {
+    try {
+      const res = await apiFetch("/ratings");
+      setItems(res.items || []);
+    } catch (err) {
+      console.error("Failed to load ratings:", err.message);
+      setItems([]);
+    } finally {
+      setLoading(false);
     }
-    const res = await apiFetch("/watchlist");
-    setRatings((res.items || []).filter((i) => i.rating != null));
   }
 
   useEffect(() => {
-    refresh();
-    const sync = () => refresh();
-    window.addEventListener("mw:sync", sync);
-    return () => window.removeEventListener("mw:sync", sync);
-  }, [isAuthenticated]);
+    refreshRatings();
+  }, []);
 
-  function getRating(media_type, id) {
-    const itemId = makeItemId(media_type, id);
-    const found = ratings.find((r) => r.itemId === itemId);
+  function getRating(itemId) {
+    const id = String(itemId);
+    const found = items.find((r) => r.itemId === id);
     return found ? found.rating : null;
   }
 
-  async function rate(item, rating) {
-    const payload = {
-      ...item,
-      media_type: item.media_type,
-      id: item.id,
-      itemId: item.itemId || makeItemId(item.media_type, item.id),
-      rating,
-    };
+  // ✅ FIX: receives FULL ITEM
+  async function rate(itemId, rating) {
+    const payload = toRatingPayload(itemId, rating);
 
-    await apiFetch("/watchlist", {
+    await apiFetch("/ratings", {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
-    window.dispatchEvent(new Event("mw:sync"));
+    await refreshRatings();
   }
 
-  async function unrate(media_type, id) {
-    await apiFetch("/watchlist", {
-      method: "POST",
-      body: JSON.stringify({
-        media_type,
-        id,
-        itemId: makeItemId(media_type, id),
-        rating: null,
-      }),
+  async function unrate(itemId) {
+    const id = String(itemId);
+
+    await apiFetch(`/ratings/${encodeURIComponent(id)}`, {
+      method: "DELETE",
     });
 
-    window.dispatchEvent(new Event("mw:sync"));
+    await refreshRatings();
   }
 
-  const value = useMemo(
-    () => ({ ratings, getRating, rate, unrate }),
-    [ratings]
-  );
-
   return (
-    <RatingsContext.Provider value={value}>
+    <RatingsContext.Provider
+      value={{
+        ratings: items,
+        loading,
+        getRating,
+        rate,
+        unrate,
+      }}
+    >
       {children}
     </RatingsContext.Provider>
   );
-}
-
-export function useRatings() {
-  return useContext(RatingsContext);
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRatings } from "../state/RatingsContext.jsx";
 
 export default function RatingModal() {
-  const { ratings, rate, unrate } = useRatings() || {};
+  const { ratings, rate, unrate, getRating } = useRatings() || {};
   const [open, setOpen] = useState(null);
   const [value, setValue] = useState(0);
   const [hover, setHover] = useState(0);
@@ -15,26 +15,28 @@ export default function RatingModal() {
 
       setOpen(item);
 
-      const existing = ratings?.find(
-        (r) => r.id === item.id && r.media_type === item.media_type
-      );
-
-      setValue(existing?.rating ?? 0);
+      // ✅ Correct lookup via context
+      const existingRating = getRating?.(item.id);
+      setValue(existingRating ?? 0);
     };
 
     window.addEventListener("rating-open", onOpen);
     return () => window.removeEventListener("rating-open", onOpen);
-  }, [ratings]);
+  }, [getRating]);
 
   if (!open) return null;
 
   const save = () => {
-    if (value > 0 && rate) rate(open, value);
+    if (value > 0 && rate) {
+      rate(open, value); // ✅ FULL ITEM
+    }
     setOpen(null);
   };
 
   const clear = () => {
-    if (unrate) unrate(open.media_type, open.id);
+    if (unrate) {
+      unrate(open.id); // ✅ ONLY itemId
+    }
     setOpen(null);
   };
 
@@ -51,7 +53,7 @@ export default function RatingModal() {
           fontSize: "32px",
           color: filled ? "#facc15" : "#4b5563",
           transition: "color 0.1s",
-          marginRight: 4
+          marginRight: 4,
         }}
       >
         ★
@@ -100,7 +102,11 @@ export default function RatingModal() {
             </p>
 
             <div className="actions-row" style={{ marginTop: 16 }}>
-              <button className="btn primary" onClick={save} disabled={value === 0}>
+              <button
+                className="btn primary"
+                onClick={save}
+                disabled={value === 0}
+              >
                 Speichern
               </button>
               <button className="btn ghost" onClick={clear}>

@@ -1,90 +1,80 @@
-// src/state/WatchlistContext.jsx
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
-import { useAuth } from "./AuthContext.jsx";
 
 const WatchlistContext = createContext(null);
 
-const makeItemId = (media_type, id) => `${media_type}_${id}`;
+export function useWatchlist() {
+  return useContext(WatchlistContext);
+}
 
-const normalize = (item) => {
-  const media_type = item.media_type;
-  const id = item.id;
-
+// Normalize TMDB item → backend format
+function toWatchlistItem(item) {
   return {
-    ...item,
-    media_type,
-    id,
-    itemId: item.itemId || makeItemId(media_type, id),
-    title: item.title || item.name || "",
+    itemId: String(item.id), // REQUIRED by backend
+    id: item.id,
+    media_type: item.media_type || (item.title ? "movie" : "tv"),
+    title: item.title || item.name,
+    poster_path: item.poster_path,
+    release_date: item.release_date || item.first_air_date,
+    vote_average: item.vote_average,
   };
-};
+}
 
 export function WatchlistProvider({ children }) {
-  const { isAuthenticated } = useAuth();
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  async function refresh() {
-    if (!isAuthenticated) {
+  // Load from DynamoDB
+  async function refreshWatchlist() {
+    try {
+      const res = await apiFetch("/watchlist");
+      setItems(res.items || []);
+    } catch (err) {
+      console.error("Failed to load watchlist:", err.message);
       setItems([]);
-      return;
+    } finally {
+      setLoading(false);
     }
-    const res = await apiFetch("/watchlist");
-    setItems(res.items || []);
   }
 
   useEffect(() => {
-    refresh();
-    const sync = () => refresh();
-    window.addEventListener("mw:sync", sync);
-    return () => window.removeEventListener("mw:sync", sync);
-  }, [isAuthenticated]);
+    refreshWatchlist();
+  }, []);
 
-  function isInList(media_type, id) {
-    const itemId = makeItemId(media_type, id);
+  function isInList(itemId) {
     return items.some((i) => i.itemId === itemId);
   }
 
-  async function add(item) {
-    const payload = normalize(item);
+  async function add(itemId) {
+    const payload = toWatchlistItem(itemId);
 
     await apiFetch("/watchlist", {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
-    setItems((prev) =>
-      prev.some((i) => i.itemId === payload.itemId)
-        ? prev
-        : [payload, ...prev]
-    );
-
-    window.dispatchEvent(new Event("mw:sync"));
+    await refreshWatchlist();
   }
 
-  async function remove(media_type, id) {
-    const itemId = makeItemId(media_type, id);
-
+  async function remove(itemId) {
     await apiFetch(`/watchlist/${encodeURIComponent(itemId)}`, {
       method: "DELETE",
     });
 
-    setItems((prev) => prev.filter((i) => i.itemId !== itemId));
-    window.dispatchEvent(new Event("mw:sync"));
+    await refreshWatchlist();
   }
 
-  const value = useMemo(
-    () => ({ items, add, remove, isInList }),
-    [items]
-  );
-
   return (
-    <WatchlistContext.Provider value={value}>
+    <WatchlistContext.Provider
+      value={{
+        items,
+        loading,
+        add,
+        remove,
+        isInList,
+      }}
+    >
       {children}
     </WatchlistContext.Provider>
   );
-}
-
-export function useWatchlist() {
-  return useContext(WatchlistContext);
 }

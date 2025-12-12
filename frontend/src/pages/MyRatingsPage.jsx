@@ -17,15 +17,14 @@ export default function MyRatingsPage() {
     return () => window.removeEventListener("detail-open", onOpen);
   }, []);
 
-  const inList =
-    open ? isInList(open.media_type, open.id) : false;
+  const inList = open ? isInList(open.id) : false;
 
   const toggle = () => {
     if (!open) return;
     if (inList) {
-      remove(open.media_type, open.id);
+      remove(open.id);
     } else {
-      add({ ...open, title: open.title || open.name });
+      add(open);
     }
   };
 
@@ -37,7 +36,6 @@ export default function MyRatingsPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 12,
             marginBottom: 12,
           }}
         >
@@ -55,9 +53,18 @@ export default function MyRatingsPage() {
           </div>
         ) : (
           <div className="media-grid">
-            {ratings.map((it) => (
-              <MediaCard key={`${it.media_type}-${it.id}`} item={it} />
-            ))}
+            {ratings.map((r) => {
+              // 🔧 Rebuild a MediaCard-compatible item
+              const item = {
+                id: Number(r.itemId),
+                itemId: r.itemId,
+                media_type: "movie", // default (TMDB id space overlaps safely)
+                title: r.title ?? `Film ${r.itemId}`,
+                poster_path: r.poster_path ?? null,
+              };
+
+              return <MediaCard key={r.itemId} item={item} />;
+            })}
           </div>
         )}
       </section>
