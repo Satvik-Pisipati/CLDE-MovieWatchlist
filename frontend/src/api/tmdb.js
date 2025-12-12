@@ -1,53 +1,77 @@
+// src/api/tmdb.js
+
 import { apiFetch } from "./client";
 
-// Build poster URL
+/* -----------------------------------------
+   Helpers
+------------------------------------------ */
+
 export function posterUrl(path) {
-  if (!path) return "https://via.placeholder.com/500x750?text=No+Image";
-  return `https://image.tmdb.org/t/p/w500${path}`;
+  return path
+    ? `https://image.tmdb.org/t/p/w500${path}`
+    : null;
 }
 
-// Generic TMDB fetch (StatsPage needs this)
-export async function fetchTMDB(endpoint) {
-  if (!endpoint) return null;
+/* -----------------------------------------
+   TMDB: Trending
+------------------------------------------ */
 
-  const encoded = encodeURIComponent(endpoint);
-  const data = await apiFetch(`/tmdb?endpoint=${encoded}`);
-
-  return data.data || null;
-}
-
-// Search TMDB
-export async function searchTMDB(query) {
-  if (!query) return [];
-
-  const endpoint = `search/multi?query=${encodeURIComponent(query)}&language=de-DE`;
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-
-  return data.data?.results || [];
-}
-
-// Trending lists
 export async function trendingTMDB() {
   const endpoint = "trending/all/week?language=de-DE";
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data?.results || [];
+  const res = await apiFetch(
+    `/tmdb?endpoint=${encodeURIComponent(endpoint)}`
+  );
+
+  return res.data?.results ?? [];
 }
 
-// Genre list
+/* -----------------------------------------
+   TMDB: Genres
+------------------------------------------ */
+
 export async function getGenres() {
   const endpoint = "genre/movie/list?language=de-DE";
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
-  return data.data?.genres || [];
+  const res = await apiFetch(
+    `/tmdb?endpoint=${encodeURIComponent(endpoint)}`
+  );
+
+  return res.data?.genres ?? [];
 }
 
-// Recommendations
-export async function recommendationsFromWatchlist(items) {
-  if (!items.length) return [];
+/* -----------------------------------------
+   TMDB: Search
+------------------------------------------ */
 
-  const first = items[0];
-  const endpoint = `${first.media_type}/${first.id}/recommendations?language=de-DE`;
+export async function searchTMDB(query) {
+  if (!query || !query.trim()) return [];
 
-  const data = await apiFetch(`/tmdb?endpoint=${encodeURIComponent(endpoint)}`);
+  const endpoint =
+    `search/multi?query=${encodeURIComponent(query)}&language=de-DE`;
 
-  return data.data?.results || [];
+  const res = await apiFetch(
+    `/tmdb?endpoint=${encodeURIComponent(endpoint)}`
+  );
+
+  return res.data?.results ?? [];
+}
+
+/* -----------------------------------------
+   TMDB: Recommendations from Watchlist
+------------------------------------------ */
+
+export async function recommendationsFromWatchlist(watchlist) {
+  if (!Array.isArray(watchlist) || watchlist.length === 0) return [];
+
+  const first = watchlist[0];
+
+  if (!first.media_type || !first.id) return [];
+
+  const endpoint =
+    `${first.media_type}/${first.id}/recommendations?language=de-DE`;
+
+  const res = await apiFetch(
+    `/tmdb?endpoint=${encodeURIComponent(endpoint)}`
+  );
+
+  return res.data?.results ?? [];
 }

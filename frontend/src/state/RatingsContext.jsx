@@ -1,37 +1,43 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { loadWatchlist, saveWatchlistItem } from "../api/watchlist";
-
+import { createContext, useContext } from "react";
+import { apiFetch } from "../api/client";
+ 
 const RatingsContext = createContext();
-
+ 
 export function RatingsProvider({ children }) {
-  const [ratings, setRatings] = useState([]);
-
-  useEffect(() => {
-    refreshRatings();
-  }, []);
-
-  async function refreshRatings() {
-    try {
-      const items = await loadWatchlist();
-      setRatings(items || []);
-    } catch (e) {
-      console.warn("Ratings refresh failed:", e.message);
-    }
-  }
 
   async function rateItem(item, rating) {
-    const updated = { ...item, rating };
-    await saveWatchlistItem(updated);
-    refreshRatings();
+
+    await apiFetch("/watchlist", {
+
+      method: "POST",
+
+      body: JSON.stringify({
+
+        ...item,
+
+        itemId: item.id,
+
+        rating,
+
+      }),
+
+    });
+
   }
-
+ 
   return (
-    <RatingsContext.Provider value={{ ratings, rateItem }}>
-      {children}
-    </RatingsContext.Provider>
-  );
-}
+<RatingsContext.Provider value={{ rateItem }}>
 
-export function useRatings() {
-  return useContext(RatingsContext);
+      {children}
+</RatingsContext.Provider>
+
+  );
+
 }
+ 
+export function useRatings() {
+
+  return useContext(RatingsContext);
+
+}
+ 

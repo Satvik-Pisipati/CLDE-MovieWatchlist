@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRatings } from "../state/RatingsContext.jsx";
-import { fetchTMDB } from "../api/tmdb.js";
 
 export default function StatsPage() {
   const { ratings } = useRatings() || { ratings: [] };

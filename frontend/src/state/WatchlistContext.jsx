@@ -1,83 +1,72 @@
 import { createContext, useContext, useEffect, useState } from "react";
-
-// --- API CALL HELPERS ---
-async function api(method, url, body) {
-  const token = localStorage.getItem("googleToken");
-  if (!token) throw new Error("Missing Google token");
-
-  const res = await fetch(import.meta.env.VITE_API_URL + url, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "x-google-id-token": token
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || "API error");
-
-  return json;
-}
-
-// --- WATCHLIST CONTEXT ---
+import { useAuth } from "../state/AuthContext";
+import {
+  loadWatchlist,
+  saveWatchlistItem,
+  deleteWatchlistItem,
+} from "../api/watchlist";
+ 
 const WatchlistContext = createContext();
-export const useWatchlist = () => useContext(WatchlistContext);
-
+ 
 export function WatchlistProvider({ children }) {
-  const [list, setList] = useState([]);
+  const { user } = useAuth();
+  const [items, setItems] = useState([]);
   const [loaded, setLoaded] = useState(false);
-
-  // Load from backend
-  async function refresh() {
-    try {
-      const data = await api("GET", "/watchlist");
-      setList(data.items || []);
-    } catch (err) {
-      console.error("Watchlist refresh failed:", err);
+ 
+  async function refreshWatchlist() {
+    if (!user) {
+      setItems([]);
+      setLoaded(true);
+      return;
     }
-    setLoaded(true);
-  }
-
-  // Add item
-  async function add(item) {
+ 
     try {
-      await api("POST", "/watchlist", {
-        itemId: `${item.media_type}-${item.id}`,
-        title: item.title || item.name,
-        media_type: item.media_type
-      });
-      await refresh();
+      const list = await loadWatchlist();
+      setItems(list);
     } catch (err) {
-      console.error("Add to backend failed:", err);
+      console.warn("Watchlist refresh failed:", err);
+    } finally {
+      setLoaded(true);
     }
   }
-
-  // Remove item
-  async function remove(media_type, id) {
-    const itemId = `${media_type}-${id}`;
-    try {
-      await api("DELETE", `/watchlist/${itemId}`);
-      await refresh();
-    } catch (err) {
-      console.error("Remove failed:", err);
-    }
-  }
-
-  // Check if item is in list
-  function isInList(media_type, id) {
-    const itemId = `${media_type}-${id}`;
-    return list.some((x) => x.itemId === itemId);
-  }
-
-  // Load once on startup
+ 
   useEffect(() => {
-    refresh();
-  }, []);
-
+    // refetch whenever user changes (login / logout)
+    refreshWatchlist();
+  }, [user?.sub]);
+ 
+  async function toggleWatchlist(item) {
+    if (!user) return;
+ 
+    const itemId = `${item.media_type}-${item.id}`;
+    const exists = items.some((i) => i.itemId === itemId);
+ 
+    if (exists) {
+      await deleteWatchlistItem(itemId);
+    } else {
+      await saveWatchlistItem({
+        ...item,
+        itemId,
+      });
+    }
+ 
+    await refreshWatchlist();
+  }
+ 
+  function isInWatchlist(media_type, id) {
+    const itemId = `${media_type}-${id}`;
+    return items.some((i) => i.itemId === itemId);
+  }
+ 
   return (
-    <WatchlistContext.Provider value={{ list, add, remove, isInList, refresh, loaded }}>
+<WatchlistContext.Provider
+      value={{ items, toggleWatchlist, isInWatchlist, refreshWatchlist, loaded }}
+>
       {children}
-    </WatchlistContext.Provider>
+</WatchlistContext.Provider>
   );
+}
+ 
+export function useWatchlist() {
+  return useContext(WatchlistContext);
 }

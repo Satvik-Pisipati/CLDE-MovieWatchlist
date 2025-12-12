@@ -13,7 +13,7 @@ import jwt from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 
 const TABLE_NAME = process.env.TABLE_NAME;            // "MovieWatchlist"
-const RATINGS_TABLE = process.env.RATINGS_TABLE_NAME; // "MovieRatings"
+const RATINGS_TABLE_NAME = process.env.RATINGS_TABLE_NAME; // "MovieRatings"
 const TMDB_KEY = process.env.TMDB_KEY;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 

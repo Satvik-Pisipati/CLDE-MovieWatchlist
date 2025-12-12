@@ -19,7 +19,7 @@ function buildHeaders() {
 ------------------------------------------ */
 
 export async function fetchWatchlist() {
-  const res = await fetch(`${BACKEND_URL}/watchlist`, {
+  const res = await fetch(`${VITE_BACKEND_URL}/watchlist`, {
     method: "GET",
     headers: buildHeaders(),
   });
@@ -34,7 +34,7 @@ export async function fetchWatchlist() {
 }
 
 export async function addToWatchlist(item) {
-  const res = await fetch(`${BACKEND_URL}/watchlist`, {
+  const res = await fetch(`${VITE_BACKEND_URL}/watchlist`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify(item),
@@ -50,7 +50,7 @@ export async function addToWatchlist(item) {
 }
 
 export async function removeFromWatchlist(itemId) {
-  const res = await fetch(`${BACKEND_URL}/watchlist/${encodeURIComponent(
+  const res = await fetch(`${VITE_BACKEND_URL}/watchlist/${encodeURIComponent(
     itemId
   )}`, {
     method: "DELETE",
