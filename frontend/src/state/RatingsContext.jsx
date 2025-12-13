@@ -8,9 +8,22 @@ export function useRatings() {
 }
 
 // Normalize item → backend payload
+/* function toRatingPayload(item, rating) {
+  return {
+    itemId: String(item.id ?? item.itemId),
+    rating,
+  };
+} */
+
 function toRatingPayload(item, rating) {
   return {
     itemId: String(item.id ?? item.itemId),
+    id: item.id,
+    media_type: item.media_type,
+    title: item.title || item.name,
+    poster_path: item.poster_path,
+    release_date: item.release_date || item.first_air_date,
+    vote_average: item.vote_average,
     rating,
   };
 }
@@ -42,8 +55,8 @@ export function RatingsProvider({ children }) {
   }
 
   // ✅ FIX: receives FULL ITEM
-  async function rate(itemId, rating) {
-    const payload = toRatingPayload(itemId, rating);
+  async function rate(item, rating) {
+    const payload = toRatingPayload(item, rating);
 
     await apiFetch("/ratings", {
       method: "POST",

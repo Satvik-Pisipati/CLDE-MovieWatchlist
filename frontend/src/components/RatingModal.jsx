@@ -16,7 +16,9 @@ export default function RatingModal() {
       setOpen(item);
 
       // ✅ Correct lookup via context
-      const existingRating = getRating?.(item.id);
+      //const existingRating = getRating?.(item.id);
+      const existingRating = getRating?.(item.itemId ?? item.id);
+
       setValue(existingRating ?? 0);
     };
 

@@ -23,16 +23,31 @@ export default function MediaCard({ item }) {
   const displayTitle = title || name || "Unbenannt";
   const date = release_date || first_air_date || "";
 
-  const inList = watch.isInList ? watch.isInList(id) : false;
+  // 🔑 Canonical key used everywhere
+  const itemKey = String(item.itemId ?? id);
 
+  // Watchlist state
+  const inList = watch.isInList ? watch.isInList(itemKey) : false;
+
+  // Ratings state
   const existingRating = ratings.getRating
-    ? ratings.getRating(id)
+    ? ratings.getRating(itemKey)
     : null;
+
+  // --------------------------------------------------
+  // Events
+  // --------------------------------------------------
 
   const openDetails = () => {
     window.dispatchEvent(
       new CustomEvent("detail-open", {
-        detail: { ...item, media_type, title: displayTitle },
+        detail: {
+          ...item,
+          itemId: itemKey,
+          id,
+          media_type,
+          title: displayTitle,
+        },
       })
     );
   };
@@ -41,7 +56,13 @@ export default function MediaCard({ item }) {
     e.stopPropagation();
     window.dispatchEvent(
       new CustomEvent("rating-open", {
-        detail: { ...item, media_type, title: displayTitle },
+        detail: {
+          ...item,
+          itemId: itemKey,
+          id,
+          media_type,
+          title: displayTitle,
+        },
       })
     );
   };
@@ -51,16 +72,22 @@ export default function MediaCard({ item }) {
     if (!watch.add || !watch.remove) return;
 
     if (inList) {
-      watch.remove(id);
+      watch.remove(itemKey);
     } else {
+      // Pass FULL item – context handles normalization
       watch.add({
         ...item,
+        itemId: itemKey,
         id,
         media_type,
         title: displayTitle,
       });
     }
   };
+
+  // --------------------------------------------------
+  // Render
+  // --------------------------------------------------
 
   return (
     <article className="card media-card" onClick={openDetails}>
@@ -83,11 +110,23 @@ export default function MediaCard({ item }) {
             {media_type === "tv" ? "SERIES" : "MOVIE"}
           </span>
           {date && <span>{date}</span>}
-          {vote_average != null && <span>★ {vote_average.toFixed(1)}</span>}
+          {vote_average != null && (
+            <span>★ {vote_average.toFixed(1)}</span>
+          )}
         </div>
 
-        <div className="actions" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button className={`btn ${inList ? "" : "primary"}`} onClick={toggleWatchlist}>
+        <div
+          className="actions"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <button
+            className={`btn ${inList ? "" : "primary"}`}
+            onClick={toggleWatchlist}
+          >
             {inList ? "Aus Watchlist entfernen" : "Zur Watchlist"}
           </button>
 

@@ -9,14 +9,17 @@ export function useWatchlist() {
 
 // Normalize TMDB item → backend format
 function toWatchlistItem(item) {
+  if (!item || !item.id) {
+    throw new Error("toWatchlistItem requires a media item with id");
+  }
   return {
-    itemId: String(item.id), // REQUIRED by backend
+    itemId: String(item.itemId ?? item.id), // canonical ID (string)
     id: item.id,
     media_type: item.media_type || (item.title ? "movie" : "tv"),
     title: item.title || item.name,
-    poster_path: item.poster_path,
-    release_date: item.release_date || item.first_air_date,
-    vote_average: item.vote_average,
+    poster_path: item.poster_path ?? null,
+    release_date: item.release_date || item.first_air_date || null,
+    vote_average: item.vote_average ?? null,
   };
 }
 
@@ -42,11 +45,16 @@ export function WatchlistProvider({ children }) {
   }, []);
 
   function isInList(itemId) {
-    return items.some((i) => i.itemId === itemId);
+    const key = String(itemId);
+    return items.some((i) => i.itemId === key);
   }
 
-  async function add(itemId) {
-    const payload = toWatchlistItem(itemId);
+  async function add(item) {
+    if (!item || !item.id) {
+      throw new Error("watch.add() requires a full media item with id");
+    }
+
+    const payload = toWatchlistItem(item);
 
     await apiFetch("/watchlist", {
       method: "POST",
@@ -56,8 +64,13 @@ export function WatchlistProvider({ children }) {
     await refreshWatchlist();
   }
 
+  /**
+   * Remove an item from the watchlist by itemId.
+   */
   async function remove(itemId) {
-    await apiFetch(`/watchlist/${encodeURIComponent(itemId)}`, {
+    const key = String(itemId);
+
+    await apiFetch(`/watchlist/${encodeURIComponent(key)}`, {
       method: "DELETE",
     });
 

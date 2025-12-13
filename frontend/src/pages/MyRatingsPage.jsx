@@ -53,7 +53,7 @@ export default function MyRatingsPage() {
           </div>
         ) : (
           <div className="media-grid">
-            {ratings.map((r) => {
+            {/* {ratings.map((r) => {
               // 🔧 Rebuild a MediaCard-compatible item
               const item = {
                 id: Number(r.itemId),
@@ -64,7 +64,10 @@ export default function MyRatingsPage() {
               };
 
               return <MediaCard key={r.itemId} item={item} />;
-            })}
+            })} */}
+            {ratings.map((item) => (
+              <MediaCard key={item.itemId} item={item} />
+            ))}
           </div>
         )}
       </section>
