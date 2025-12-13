@@ -65,12 +65,12 @@ export default function WatchlistPage() {
         )}
       </section>
 
-      <DetailsModal
+      {/* <DetailsModal
         item={open}
         onClose={() => setOpen(null)}
         onToggleList={toggle}
         inList={inList}
-      />
+      /> */}
       <RatingModal />
     </div>
   );

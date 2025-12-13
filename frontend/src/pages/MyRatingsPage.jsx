@@ -72,12 +72,12 @@ export default function MyRatingsPage() {
         )}
       </section>
 
-      <DetailsModal
+      {/* <DetailsModal
         item={open}
         onClose={() => setOpen(null)}
         onToggleList={toggle}
         inList={inList}
-      />
+      /> */}
       <RatingModal />
     </div>
   );

@@ -2,44 +2,72 @@ import { useEffect, useRef } from "react";
 import { posterUrl } from "../api/tmdb";
 
 export default function DetailsModal({ item, onClose, onToggleList, inList }) {
-  const ref = useRef();
+  const ref = useRef(null);
 
+  // Close modal on outside click
   useEffect(() => {
     function handleClickOutside(e) {
       if (ref.current && !ref.current.contains(e.target)) {
         onClose();
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
   if (!item) return null;
 
+  const title = item.title || item.name || "Unbenannt";
+
   return (
-    <div className="modal-backdrop">
+    <div className="modal-overlay">
       <div className="modal" ref={ref}>
-        <button className="close-btn" onClick={onClose}>
+        {/* Close */}
+        <button
+          className="close-btn"
+          onClick={onClose}
+          aria-label="Schliessen"
+        >
           ✖
         </button>
 
-        {/* Poster */}
-        <img
-          className="modal-poster"
-          src={posterUrl(item.poster_path)}
-          alt={item.title || item.name}
-        />
+        <div className="modal-body">
+          {/* Poster */}
+          <div className="modal-media">
+            {item.poster_path ? (
+              <img
+                src={posterUrl(item.poster_path)}
+                alt={title}
+                loading="lazy"
+              />
+            ) : (
+              <div className="poster placeholder">Kein Bild</div>
+            )}
+          </div>
 
-        {/* Title */}
-        <h2>{item.title || item.name}</h2>
+          {/* Content */}
+          <div className="modal-content">
+            <h2>{title}</h2>
 
-        {/* Info */}
-        <p>{item.overview}</p>
+            {item.overview ? (
+              <p>{item.overview}</p>
+            ) : (
+              <p style={{ opacity: 0.7 }}>
+                Keine Beschreibung verfügbar.
+              </p>
+            )}
 
-        {/* Add / Remove Watchlist */}
-        <button className="btn primary" onClick={onToggleList}>
-          {inList ? "Remove from Watchlist" : "Add to Watchlist"}
-        </button>
+            <div style={{ marginTop: "1rem" }}>
+              <button className="btn primary" onClick={onToggleList}>
+                {inList
+                  ? "Aus Watchlist entfernen"
+                  : "Zur Watchlist"}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

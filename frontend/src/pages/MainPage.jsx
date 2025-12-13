@@ -29,18 +29,23 @@ export default function MainPage() {
 
   const [open, setOpen] = useState(null);
 
-  const { items: list, add, remove, isInList } = useWatchlist();
+  const { items: watchlist, add, remove, isInList } = useWatchlist();
   const { ratings } = useRatings() || { ratings: [] };
 
   const TRENDING_LIMIT = 10;
   const SUGGEST_LIMIT = 10;
 
+  // --------------------------------------------------
   // Load trending + genres
+  // --------------------------------------------------
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [trend, gens] = await Promise.all([trendingTMDB(), getGenres()]);
+        const [trend, gens] = await Promise.all([
+          trendingTMDB(),
+          getGenres(),
+        ]);
         setTrending(trend);
         setCategories(gens);
       } finally {
@@ -49,14 +54,18 @@ export default function MainPage() {
     })();
   }, []);
 
-  // Suggestions based on watchlist + ratings
+  // --------------------------------------------------
+  // Suggestions from watchlist + ratings
+  // --------------------------------------------------
   useEffect(() => {
     (async () => {
-      const base = [...(list || []), ...(ratings || [])];
+      const base = [...(watchlist || []), ...(ratings || [])];
+
       if (base.length === 0 || query.trim()) {
         setSuggestions([]);
         return;
       }
+
       try {
         const recs = await recommendationsFromWatchlist(base);
         setSuggestions(recs || []);
@@ -64,15 +73,19 @@ export default function MainPage() {
         setSuggestions([]);
       }
     })();
-  }, [list, ratings, query]);
+  }, [watchlist, ratings, query]);
 
-  // Live search debounce
+  // --------------------------------------------------
+  // Live search (debounced)
+  // --------------------------------------------------
   useEffect(() => {
     const q = query.trim();
+
     if (!q) {
       setResults([]);
       return;
     }
+
     const timeout = setTimeout(async () => {
       setLoading(true);
       try {
@@ -82,12 +95,16 @@ export default function MainPage() {
         setLoading(false);
       }
     }, 350);
+
     return () => clearTimeout(timeout);
   }, [query]);
 
   const showingResults = results.length > 0 && query.trim().length > 0;
   const baseList = showingResults ? results : trending;
 
+  // --------------------------------------------------
+  // Filter + sort
+  // --------------------------------------------------
   const visible = useMemo(() => {
     let filtered = baseList;
 
@@ -102,60 +119,82 @@ export default function MainPage() {
       );
     }
 
-    const sorted = [...filtered].sort((a, b) => {
-      if (sort === "title")
-        return (a.title || a.name || "").localeCompare(b.title || b.name || "");
-      if (sort === "date")
+    return [...filtered].sort((a, b) => {
+      if (sort === "title") {
+        return (a.title || a.name || "").localeCompare(
+          b.title || b.name || ""
+        );
+      }
+      if (sort === "date") {
         return (
           new Date(b.release_date || b.first_air_date || 0) -
           new Date(a.release_date || a.first_air_date || 0)
         );
-      if (sort === "rating")
+      }
+      if (sort === "rating") {
         return (b.vote_average || 0) - (a.vote_average || 0);
+      }
       return (b.popularity || 0) - (a.popularity || 0);
     });
-
-    return sorted;
   }, [baseList, sort, type, category]);
 
-  // Details modal open (your app uses this event pattern)
+  // --------------------------------------------------
+  // Details modal open (event-based)
+  // --------------------------------------------------
   useEffect(() => {
     const onOpen = (e) => setOpen(e.detail);
     window.addEventListener("detail-open", onOpen);
     return () => window.removeEventListener("detail-open", onOpen);
   }, []);
 
-  const inList = open ? isInList(open.media_type, open.id) : false;
+  // --------------------------------------------------
+  // Watchlist toggle (CORRECT)
+  // --------------------------------------------------
+  const itemKey = open ? String(open.itemId ?? open.id) : null;
+  const inList = open ? isInList(itemKey) : false;
 
   const toggle = () => {
     if (!open) return;
-    if (inList) remove(open.media_type, open.id);
-    else add({ ...open, title: open.title || open.name });
+
+    if (inList) {
+      remove(itemKey);
+    } else {
+      add({
+        ...open,
+        itemId: itemKey,
+        title: open.title || open.name,
+      });
+    }
   };
 
+  // --------------------------------------------------
+  // Render
+  // --------------------------------------------------
   return (
     <div className="main-page">
       <div className="container">
         {/* Hero + Search */}
         <section className="search-hero card page-wrap" style={{ marginTop: "1rem" }}>
           <h1 className="hero-brand">MovieWatchlist 🎬</h1>
-          <h2 className="hero-title">Find your next movie or show</h2>
-          <p className="hero-sub">Search across movies, series, and more.</p>
+          <h2 className="hero-title">Finde deinen nächsten Film oder Serie</h2>
+          <p className="hero-sub">
+            Suche nach Filmen, Serien und mehr.
+          </p>
 
           <form onSubmit={(e) => e.preventDefault()} className="search-form">
             <input
               className="input"
-              placeholder="Search for a title..."
+              placeholder="Titel suchen…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             <button type="button" className="btn primary">
-              Search
+              Suchen
             </button>
           </form>
         </section>
 
-        {/* Filters + Main Grid */}
+        {/* Filters + Grid */}
         <section className="results page-wrap">
           <FiltersBar
             sort={sort}
@@ -167,39 +206,59 @@ export default function MainPage() {
             categories={categories}
           />
 
-          <h3 className="section-title" style={{ marginTop: "12px" }}>
-            {showingResults ? "Suchergebnisse" : "Trending Now"}
+          <h3 className="section-title" style={{ marginTop: 12 }}>
+            {showingResults ? "Suchergebnisse" : "Aktuell beliebt"}
           </h3>
 
           <div className="media-grid">
             {loading
-              ? Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)
-              : (showingResults ? visible : visible.slice(0, TRENDING_LIMIT)).map((item) => (
-                  <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
-                ))}
+              ? Array.from({ length: 12 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))
+              : (showingResults ? visible : visible.slice(0, TRENDING_LIMIT)).map(
+                  (item) => (
+                    <MediaCard
+                      key={`${item.media_type}-${item.id}`}
+                      item={item}
+                    />
+                  )
+                )}
           </div>
 
           {!loading && showingResults && visible.length === 0 && (
-            <p className="empty-state">Keine Ergebnisse.</p>
+            <p className="empty-state">Keine Ergebnisse gefunden.</p>
           )}
         </section>
 
-        {/* Recommendations BELOW trending (only when not searching) */}
+        {/* Recommendations */}
         {!showingResults && suggestions.length > 0 && (
           <section className="results page-wrap">
-            <h3 className="section-title">Empfehlungen aus deiner Watchlist / Bewertungen</h3>
-            <p className="section-sub">Basierend auf deinen Listen und Bewertungen.</p>
+            <h3 className="section-title">
+              Empfehlungen für dich
+            </h3>
+            <p className="section-sub">
+              Basierend auf deiner Watchlist und Bewertungen.
+            </p>
 
             <div className="media-grid">
               {suggestions.slice(0, SUGGEST_LIMIT).map((item) => (
-                <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
+                <MediaCard
+                  key={`${item.media_type}-${item.id}`}
+                  item={item}
+                />
               ))}
             </div>
           </section>
         )}
       </div>
 
-      <DetailsModal item={open} onClose={() => setOpen(null)} onToggleList={toggle} inList={inList} />
+      {/* Modals */}
+      <DetailsModal
+        item={open}
+        onClose={() => setOpen(null)}
+        onToggleList={toggle}
+        inList={inList}
+      />
       <RatingModal />
     </div>
   );
