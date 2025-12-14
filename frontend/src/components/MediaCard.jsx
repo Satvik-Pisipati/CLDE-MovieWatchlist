@@ -90,53 +90,35 @@ export default function MediaCard({ item }) {
   // --------------------------------------------------
 
   return (
-    <article className="card media-card" onClick={openDetails}>
-      {poster_path ? (
-        <img
-          className="poster"
-          src={`${IMG_BASE}${poster_path}`}
-          alt={displayTitle}
-          loading="lazy"
-        />
-      ) : (
-        <div className="poster placeholder">Kein Bild</div>
-      )}
+    <article className="card media-card">
+  <div className="media-click" onClick={openDetails}>
+    {poster_path ? (
+      <img className="poster" src={`${IMG_BASE}${poster_path}`} alt={displayTitle} />
+    ) : (
+      <div className="poster placeholder">Kein Bild</div>
+    )}
 
-      <div className="content">
-        <h3 className="title">{displayTitle}</h3>
+    <div className="content">
+      <h3 className="title">{displayTitle}</h3>
 
-        <div className="meta">
-          <span className="pill">
-            {media_type === "tv" ? "SERIES" : "MOVIE"}
-          </span>
-          {date && <span>{date}</span>}
-          {vote_average != null && (
-            <span>★ {vote_average.toFixed(1)}</span>
-          )}
-        </div>
-
-        <div
-          className="actions"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          <button
-            className={`btn ${inList ? "" : "primary"}`}
-            onClick={toggleWatchlist}
-          >
-            {inList ? "Aus Watchlist entfernen" : "Zur Watchlist"}
-          </button>
-
-          <button className="btn ghost" onClick={openRating}>
-            {existingRating != null
-              ? `Bewertet: ${existingRating}/5 ⭐`
-              : "Bewerten"}
-          </button>
-        </div>
+      <div className="meta">
+        <span className="pill">{media_type === "tv" ? "SERIES" : "MOVIE"}</span>
+        {date && <span>{date}</span>}
+        {vote_average != null && <span>★ {vote_average.toFixed(1)}</span>}
       </div>
-    </article>
+    </div>
+  </div>
+
+  <div className="actions">
+    <button className={`btn ${inList ? "" : "primary"}`} onClick={toggleWatchlist}>
+      {inList ? "Aus Watchlist entfernen" : "Zur Watchlist"}
+    </button>
+
+    <button className="btn ghost" onClick={openRating}>
+      {existingRating != null ? `Bewertet: ${existingRating}/5 ⭐` : "Bewerten"}
+    </button>
+  </div>
+</article>
+
   );
 }

@@ -127,7 +127,7 @@ export default function Layout() {
             className="drawer-link"
             onClick={closeDrawer}
           >
-            Seh-Statistik
+            Statistik
           </NavLink>
 
         </div>
